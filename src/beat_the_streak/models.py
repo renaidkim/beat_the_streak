@@ -21,7 +21,6 @@ class GameLog:
     date: str  # ISO date
     at_bats: int
     hits: int
-    opponent_pitcher_throws: str  # "L" or "R", who the batter faced that day
 
     @property
     def got_a_hit(self) -> bool:

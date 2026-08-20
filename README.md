@@ -35,13 +35,9 @@ is the natural next step once there's a results log to train on.
 
 ## A note on data access
 
-This was built in a sandboxed environment whose network egress policy
-blocks `statsapi.mlb.com`, Baseball Savant, FanGraphs, and
-Baseball-Reference — so `MlbStatsApiSource` is implemented against the
-real API but untested against live traffic here. Run it from an
-environment with normal network access, and double check the API
-response shapes against a live call before relying on it (the Stats API
-is public but only loosely documented).
+`MlbStatsApiSource` is validated against live traffic (`statsapi.mlb.com`)
+— the schedule/probables, pitcher, batter, and game-log endpoints all
+return the shapes the code expects.
 
 Known gaps in the live source, called out in the code:
 - No real vs-pitcher-hand split endpoint is wired up yet (falls back to
@@ -49,6 +45,10 @@ Known gaps in the live source, called out in the code:
 - No confirmed-lineup source (uses full active roster, not today's
   starting 9 — swap in a boxscore poll closer to game time).
 - No park-factor table (defaults to neutral, 1.0).
+- One HTTP request per batter per game (roster → per-batter person + game
+  log calls, all serial). For a full ~15-game slate with full rosters,
+  that's several hundred requests run one at a time — noticeably slow, and
+  worth parallelizing or caching before relying on this daily.
 
 ## Usage
 

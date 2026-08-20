@@ -54,8 +54,8 @@ class MlbStatsApiSource(DataSource):
         matchups: list[Matchup] = []
         for game in games:
             for side, opponent_side in (("home", "away"), ("away", "home")):
-                team = game[side]["team"]
-                opp_pitcher_info = game[opponent_side].get("probablePitcher")
+                team = game["teams"][side]["team"]
+                opp_pitcher_info = game["teams"][opponent_side].get("probablePitcher")
                 if not opp_pitcher_info:
                     continue
                 pitcher = self._get_pitcher(opp_pitcher_info["id"])
@@ -147,9 +147,6 @@ class MlbStatsApiSource(DataSource):
                 date=split["date"],
                 at_bats=int(split["stat"].get("atBats", 0)),
                 hits=int(split["stat"].get("hits", 0)),
-                opponent_pitcher_throws=split.get("opponent", {}).get(
-                    "probablePitcher", {}
-                ).get("pitchHand", {}).get("code", "R"),
             )
             for split in splits
         ]

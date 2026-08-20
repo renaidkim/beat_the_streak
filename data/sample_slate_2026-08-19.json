@@ -3,172 +3,548 @@
   "matchups": [
     {
       "batter": {
-        "id": "b01", "name": "Marcus Delgado", "bats": "R", "team": "Riverside Reds",
-        "season_avg": 0.291, "season_avg_vs_lhp": 0.278, "season_avg_vs_rhp": 0.298
+        "id": "b01",
+        "name": "Marcus Delgado",
+        "bats": "R",
+        "team": "Riverside Reds",
+        "season_avg": 0.291,
+        "season_avg_vs_lhp": 0.278,
+        "season_avg_vs_rhp": 0.298
       },
       "pitcher": {
-        "id": "p01", "name": "Grant Ashworth", "throws": "L", "era": 5.12, "oba_against": 0.279
+        "id": "p01",
+        "name": "Grant Ashworth",
+        "throws": "L",
+        "era": 5.12,
+        "oba_against": 0.279
       },
-      "is_home": true, "park_factor": 1.08,
+      "is_home": true,
+      "park_factor": 1.08,
       "recent_logs": [
-        {"date": "2026-08-09", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-10", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-11", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-12", "at_bats": 5, "hits": 3, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-13", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-14", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-15", "at_bats": 3, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-16", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-17", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"}
+        {
+          "date": "2026-08-09",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-10",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-11",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-12",
+          "at_bats": 5,
+          "hits": 3
+        },
+        {
+          "date": "2026-08-13",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-14",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-15",
+          "at_bats": 3,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 4,
+          "hits": 2
+        }
       ]
     },
     {
       "batter": {
-        "id": "b02", "name": "Tyler Hutchins", "bats": "L", "team": "Riverside Reds",
-        "season_avg": 0.264, "season_avg_vs_lhp": 0.221, "season_avg_vs_rhp": 0.281
+        "id": "b02",
+        "name": "Tyler Hutchins",
+        "bats": "L",
+        "team": "Riverside Reds",
+        "season_avg": 0.264,
+        "season_avg_vs_lhp": 0.221,
+        "season_avg_vs_rhp": 0.281
       },
       "pitcher": {
-        "id": "p01", "name": "Grant Ashworth", "throws": "L", "era": 5.12, "oba_against": 0.279
+        "id": "p01",
+        "name": "Grant Ashworth",
+        "throws": "L",
+        "era": 5.12,
+        "oba_against": 0.279
       },
-      "is_home": true, "park_factor": 1.08,
+      "is_home": true,
+      "park_factor": 1.08,
       "recent_logs": [
-        {"date": "2026-08-09", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-10", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-11", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-12", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-13", "at_bats": 3, "hits": 0, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-14", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-15", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-16", "at_bats": 3, "hits": 0, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-17", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"}
+        {
+          "date": "2026-08-09",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-10",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-11",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-12",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-13",
+          "at_bats": 3,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-14",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-15",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 3,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 4,
+          "hits": 1
+        }
       ]
     },
     {
       "batter": {
-        "id": "b03", "name": "Rafael Ontiveros", "bats": "R", "team": "Prairie City Bison",
-        "season_avg": 0.312, "season_avg_vs_lhp": 0.301, "season_avg_vs_rhp": 0.318
+        "id": "b03",
+        "name": "Rafael Ontiveros",
+        "bats": "R",
+        "team": "Prairie City Bison",
+        "season_avg": 0.312,
+        "season_avg_vs_lhp": 0.301,
+        "season_avg_vs_rhp": 0.318
       },
       "pitcher": {
-        "id": "p02", "name": "Diego Salcedo", "throws": "R", "era": 3.41, "oba_against": 0.223
+        "id": "p02",
+        "name": "Diego Salcedo",
+        "throws": "R",
+        "era": 3.41,
+        "oba_against": 0.223
       },
-      "is_home": false, "park_factor": 0.94,
+      "is_home": false,
+      "park_factor": 0.94,
       "recent_logs": [
-        {"date": "2026-08-09", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-10", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-11", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-12", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-13", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-14", "at_bats": 5, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-15", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-16", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-17", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"}
+        {
+          "date": "2026-08-09",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-10",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-11",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-12",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-13",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-14",
+          "at_bats": 5,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-15",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 4,
+          "hits": 1
+        }
       ]
     },
     {
       "batter": {
-        "id": "b04", "name": "Kenji Watanabe", "bats": "S", "team": "Prairie City Bison",
-        "season_avg": 0.256, "season_avg_vs_lhp": 0.268, "season_avg_vs_rhp": 0.249
+        "id": "b04",
+        "name": "Kenji Watanabe",
+        "bats": "S",
+        "team": "Prairie City Bison",
+        "season_avg": 0.256,
+        "season_avg_vs_lhp": 0.268,
+        "season_avg_vs_rhp": 0.249
       },
       "pitcher": {
-        "id": "p03", "name": "Cole Bannister", "throws": "R", "era": 4.87, "oba_against": 0.267
+        "id": "p03",
+        "name": "Cole Bannister",
+        "throws": "R",
+        "era": 4.87,
+        "oba_against": 0.267
       },
-      "is_home": false, "park_factor": 1.02,
+      "is_home": false,
+      "park_factor": 1.02,
       "recent_logs": [
-        {"date": "2026-08-09", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-10", "at_bats": 3, "hits": 0, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-11", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-12", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-13", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-14", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-15", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-16", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-17", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "L"}
+        {
+          "date": "2026-08-09",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-10",
+          "at_bats": 3,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-11",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-12",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-13",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-14",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-15",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 3,
+          "hits": 1
+        }
       ]
     },
     {
       "batter": {
-        "id": "b05", "name": "Dawson Pruitt", "bats": "L", "team": "Harbor Point Mariners II",
-        "season_avg": 0.301, "season_avg_vs_lhp": 0.255, "season_avg_vs_rhp": 0.319
+        "id": "b05",
+        "name": "Dawson Pruitt",
+        "bats": "L",
+        "team": "Harbor Point Mariners II",
+        "season_avg": 0.301,
+        "season_avg_vs_lhp": 0.255,
+        "season_avg_vs_rhp": 0.319
       },
       "pitcher": {
-        "id": "p04", "name": "Aaron Feliciano", "throws": "R", "era": 6.03, "oba_against": 0.291
+        "id": "p04",
+        "name": "Aaron Feliciano",
+        "throws": "R",
+        "era": 6.03,
+        "oba_against": 0.291
       },
-      "is_home": true, "park_factor": 1.11,
+      "is_home": true,
+      "park_factor": 1.11,
       "recent_logs": [
-        {"date": "2026-08-09", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-10", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-11", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-12", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-13", "at_bats": 5, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-14", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-15", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-16", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-17", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"}
+        {
+          "date": "2026-08-09",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-10",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-11",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-12",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-13",
+          "at_bats": 5,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-14",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-15",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 4,
+          "hits": 2
+        }
       ]
     },
     {
       "batter": {
-        "id": "b06", "name": "Isaiah Cordero", "bats": "R", "team": "Cascade Timberwolves",
-        "season_avg": 0.238, "season_avg_vs_lhp": 0.244, "season_avg_vs_rhp": 0.234
+        "id": "b06",
+        "name": "Isaiah Cordero",
+        "bats": "R",
+        "team": "Cascade Timberwolves",
+        "season_avg": 0.238,
+        "season_avg_vs_lhp": 0.244,
+        "season_avg_vs_rhp": 0.234
       },
       "pitcher": {
-        "id": "p05", "name": "Nate Ellison", "throws": "L", "era": 2.98, "oba_against": 0.211
+        "id": "p05",
+        "name": "Nate Ellison",
+        "throws": "L",
+        "era": 2.98,
+        "oba_against": 0.211
       },
-      "is_home": false, "park_factor": 0.90,
+      "is_home": false,
+      "park_factor": 0.9,
       "recent_logs": [
-        {"date": "2026-08-09", "at_bats": 3, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-10", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-11", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-12", "at_bats": 3, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-13", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-14", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-15", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-16", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-17", "at_bats": 3, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"}
+        {
+          "date": "2026-08-09",
+          "at_bats": 3,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-10",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-11",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-12",
+          "at_bats": 3,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-13",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-14",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-15",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 3,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 4,
+          "hits": 1
+        }
       ]
     },
     {
       "batter": {
-        "id": "b07", "name": "Julian Marsh", "bats": "R", "team": "Cascade Timberwolves",
-        "season_avg": 0.279, "season_avg_vs_lhp": 0.292, "season_avg_vs_rhp": 0.271
+        "id": "b07",
+        "name": "Julian Marsh",
+        "bats": "R",
+        "team": "Cascade Timberwolves",
+        "season_avg": 0.279,
+        "season_avg_vs_lhp": 0.292,
+        "season_avg_vs_rhp": 0.271
       },
       "pitcher": {
-        "id": "p05", "name": "Nate Ellison", "throws": "L", "era": 2.98, "oba_against": 0.211
+        "id": "p05",
+        "name": "Nate Ellison",
+        "throws": "L",
+        "era": 2.98,
+        "oba_against": 0.211
       },
-      "is_home": false, "park_factor": 0.90,
+      "is_home": false,
+      "park_factor": 0.9,
       "recent_logs": [
-        {"date": "2026-08-09", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-10", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-11", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-12", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-13", "at_bats": 4, "hits": 0, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-14", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-15", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-16", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-17", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"}
+        {
+          "date": "2026-08-09",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-10",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-11",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-12",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-13",
+          "at_bats": 4,
+          "hits": 0
+        },
+        {
+          "date": "2026-08-14",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-15",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 4,
+          "hits": 2
+        }
       ]
     },
     {
       "batter": {
-        "id": "b08", "name": "Owen Kalani", "bats": "L", "team": "Sundown Valley Comets",
-        "season_avg": 0.269, "season_avg_vs_lhp": 0.231, "season_avg_vs_rhp": 0.284
+        "id": "b08",
+        "name": "Owen Kalani",
+        "bats": "L",
+        "team": "Sundown Valley Comets",
+        "season_avg": 0.269,
+        "season_avg_vs_lhp": 0.231,
+        "season_avg_vs_rhp": 0.284
       },
       "pitcher": {
-        "id": "p06", "name": "Marcus Trejo", "throws": "R", "era": 4.35, "oba_against": 0.259
+        "id": "p06",
+        "name": "Marcus Trejo",
+        "throws": "R",
+        "era": 4.35,
+        "oba_against": 0.259
       },
-      "is_home": true, "park_factor": 1.00,
+      "is_home": true,
+      "park_factor": 1.0,
       "recent_logs": [
-        {"date": "2026-08-15", "at_bats": 4, "hits": 2, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-16", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "L"},
-        {"date": "2026-08-17", "at_bats": 3, "hits": 1, "opponent_pitcher_throws": "R"},
-        {"date": "2026-08-18", "at_bats": 4, "hits": 1, "opponent_pitcher_throws": "R"}
+        {
+          "date": "2026-08-15",
+          "at_bats": 4,
+          "hits": 2
+        },
+        {
+          "date": "2026-08-16",
+          "at_bats": 4,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-17",
+          "at_bats": 3,
+          "hits": 1
+        },
+        {
+          "date": "2026-08-18",
+          "at_bats": 4,
+          "hits": 1
+        }
       ]
     }
   ]

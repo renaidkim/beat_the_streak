@@ -27,12 +27,7 @@ def make_pitcher(**overrides) -> Pitcher:
 
 def make_logs(hit_pattern: list[int], at_bats: int = 4) -> list[GameLog]:
     return [
-        GameLog(
-            date=f"2026-08-{i + 1:02d}",
-            at_bats=at_bats,
-            hits=hits,
-            opponent_pitcher_throws="R",
-        )
+        GameLog(date=f"2026-08-{i + 1:02d}", at_bats=at_bats, hits=hits)
         for i, hits in enumerate(hit_pattern)
     ]
 
