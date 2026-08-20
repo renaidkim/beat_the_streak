@@ -144,11 +144,23 @@ class PickSet:
 
 
 def pick_top(
-    ranked_picks: list[Pick], n: int = 2, avoid_same_game: bool = True
+    ranked_picks: list[Pick], n: int = 2, avoid_same_game: bool = False
 ) -> PickSet:
-    """Select the top `n` picks, optionally avoiding two batters who share
-    the same opposing pitcher (their outcomes are correlated: one bad
-    pitching performance sinks both picks at once).
+    """Select the top `n` picks.
+
+    `avoid_same_game=True` skips a pick if it shares an opposing pitcher
+    with one already selected. Off by default -- MLB's actual "double
+    down" rule requires *both* picks to get a hit for the day to count
+    (and rewards it by advancing the streak by 2), not just one. For a
+    both-must-succeed bet, positive correlation between the two outcomes
+    *raises* the joint success probability rather than lowering it: two
+    batters facing the same pitcher rise and fall together with that
+    pitcher's performance (the same logic daily-fantasy players use to
+    "stack" hitters against a bad starter), so P(both hit) can run
+    several points above what the same two marginal probabilities would
+    give if independent. Avoiding that correlation only makes sense for
+    an at-least-one-of-two bet, which isn't how this game scores a double
+    down. Left in as an opt-in for anyone who wants to diversify anyway.
     """
     selected: list[Pick] = []
     skipped: list[Pick] = []

@@ -38,10 +38,11 @@ game (pick 1-2 batters/day who you think will record a hit).
    on a real season of outcomes, predicts P(hit) directly from those
    signals. See [Model backtest](#model-backtest) below for the two
    rounds of testing that produced this specific feature set and model
-   type — it did not start out looking like this. Picking the top N
-   avoids selecting two batters who face the *same* pitcher, since their
-   outcomes are correlated — one shutdown pitching performance sinks both
-   picks at once.
+   type — it did not start out looking like this. Picking the top N picks
+   purely by probability, *including* two batters who share a pitcher —
+   see [Why same-pitcher picks aren't avoided](#why-same-pitcher-picks-arent-avoided)
+   for why that's actually the right call for how this game scores a
+   two-pick day, not an oversight.
 4. **CLI** (`beat_the_streak/cli.py`) — prints the ranked slate and the
    recommended picks.
 
@@ -216,6 +217,37 @@ gain was consistent and reproducible, not marginal or mixed.
 Rerun `python scripts/fit_hit_probability_model.py` (needs
 `requirements-analysis.txt` for pandas/numpy on top of the runtime deps)
 once or twice a season to refresh against a more recent year.
+
+## Why same-pitcher picks aren't avoided
+
+`pick_top` used to skip a pick if it shared an opposing pitcher with one
+already selected, on the theory that two batters facing the same starter
+are a correlated bet and correlated bets are riskier. That's backwards
+for how this game actually scores a two-pick day.
+
+MLB's "double down" rule: pick two batters, and **both** need to get a
+hit for the day to count — it's not "at least one." Successfully done,
+it advances your streak by 2 instead of 1, which is the whole incentive
+to pick two at all despite the higher bar.
+
+For a bet that requires *both* legs to hit, positive correlation between
+the two outcomes raises the joint success probability, it doesn't lower
+it. Two batters facing the same pitcher rise and fall together with that
+pitcher's performance that day — a good start suppresses both of them
+together, a bad one lifts both of them together — the same logic
+daily-fantasy players use on purpose when they "stack" hitters against a
+bad starter. Concretely, for two batters the model rates at 70% each:
+independent (different games), P(both hit) ≈ 70% × 70% = 49%. Sharing a
+pitcher, with even a modest positive correlation (~0.3, a plausible
+magnitude for a shared-game effect like this), P(both hit) climbs to
+roughly 55% — several points higher, not lower. Avoiding that correlation
+only makes sense for an at-least-one-of-two bet, which isn't the rule
+here.
+
+`pick_top`'s `avoid_same_game` parameter (default `False`) and the CLI's
+`--diversify-pitchers` flag still exist for anyone who wants to
+diversify anyway, but the ranked top-N is no longer nudged away from a
+same-pitcher pair by default.
 
 ## Hosted site
 

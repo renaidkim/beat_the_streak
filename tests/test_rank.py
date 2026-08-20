@@ -92,7 +92,21 @@ def test_rank_matchups_sorts_descending():
     assert ranked[0].hit_probability >= ranked[1].hit_probability
 
 
-def test_pick_top_avoids_same_pitcher_by_default():
+def test_pick_top_allows_same_pitcher_by_default():
+    # MLB's double-down rule needs BOTH picks to hit; positive correlation
+    # (two batters sharing a pitcher) helps a both-must-succeed bet rather
+    # than hurting it, so the top 2 by probability should be picked as-is
+    # even when they share a pitcher. See rank.pick_top's docstring.
+    shared_pitcher = make_pitcher(id="shared")
+    m1 = make_matchup(batter=make_batter(id="b1"), pitcher=shared_pitcher)
+    m2 = make_matchup(batter=make_batter(id="b2"), pitcher=shared_pitcher)
+    ranked = rank_matchups([m1, m2])
+    result = pick_top(ranked, n=2)
+    assert {p.matchup.batter.id for p in result.picks} == {"b1", "b2"}
+    assert result.skipped_for_correlation == []
+
+
+def test_pick_top_diversify_pitchers_opt_in_skips_shared_pitcher():
     shared_pitcher = make_pitcher(id="shared")
     best = make_matchup(
         batter=make_batter(id="b1", career_avg=0.320), pitcher=shared_pitcher
@@ -113,16 +127,6 @@ def test_pick_top_avoids_same_pitcher_by_default():
     assert "b1" in picked_batter_ids
     assert "b2" not in picked_batter_ids  # shares b1's pitcher, should be skipped
     assert len(result.skipped_for_correlation) == 1
-
-
-def test_pick_top_allows_same_pitcher_when_disabled():
-    shared_pitcher = make_pitcher(id="shared")
-    m1 = make_matchup(batter=make_batter(id="b1"), pitcher=shared_pitcher)
-    m2 = make_matchup(batter=make_batter(id="b2"), pitcher=shared_pitcher)
-    ranked = rank_matchups([m1, m2])
-    result = pick_top(ranked, n=2, avoid_same_game=False)
-    assert len(result.picks) == 2
-    assert result.skipped_for_correlation == []
 
 
 def test_pick_top_backfills_when_avoidance_leaves_slate_short():

@@ -31,9 +31,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--show", type=int, default=10, help="How many top-ranked matchups to print (default: 10)"
     )
     parser.add_argument(
-        "--allow-same-game",
+        "--diversify-pitchers",
         action="store_true",
-        help="Allow two picks facing the same pitcher (correlated risk, off by default)",
+        help="Avoid picking two batters who face the same pitcher (off by default -- "
+        "MLB's double-down rule needs BOTH picks to hit, and positive correlation "
+        "helps a both-must-succeed bet; see rank.pick_top's docstring)",
     )
     return parser
 
@@ -56,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     ranked = rank_matchups(matchups)
-    result = pick_top(ranked, n=args.picks, avoid_same_game=not args.allow_same_game)
+    result = pick_top(ranked, n=args.picks, avoid_same_game=args.diversify_pitchers)
 
     print(f"Top {min(args.show, len(ranked))} matchups for {args.date}:\n")
     for i, pick in enumerate(ranked[: args.show], start=1):
