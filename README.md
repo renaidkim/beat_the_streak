@@ -369,6 +369,20 @@ for being non-monotonic), and Baseball Savant's leaderboard endpoint is
 an unofficial, undocumented CSV export -- a real added fragility for a
 benefit that isn't clearly established. Not implemented.
 
+**Pruning the shipped model's weakest features, tested and not worth
+it:** `scripts/test_pruning.py` refits the 12-feature model, ranks
+features by fresh permutation importance, then backward-eliminates the
+weakest 1-5 (by that ranking) one at a time. Best candidate (drop
+`career_obp`, `pitcher_throws_L`, `bats_L` -- the only three with
+importance at or below +0.00003) scored log loss 0.6467 vs. the full
+model's 0.6468. A paired bootstrap (2000 resamples of the holdout) on
+that gap gives a 95% CI of [-0.00024, +0.00007] -- spanning zero, i.e.
+not distinguishable from noise at this holdout's size (10,222 rows).
+Not shipped: pruning is a legitimate parsimony argument (9 features
+instead of 12, one fewer live API field), but there's no measured
+accuracy cost *or* benefit either way, so it wasn't judged worth the
+code churn absent an actual improvement.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes
