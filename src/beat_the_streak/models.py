@@ -18,24 +18,15 @@ class Pitcher:
 
 
 @dataclass(frozen=True)
-class RecentForm:
-    """Aggregate batting line over a batter's last N games (not per-game)."""
-
-    games_played: int
-    at_bats: int
-    hits: int
-
-    @property
-    def avg(self) -> float | None:
-        return self.hits / self.at_bats if self.at_bats > 0 else None
-
-
-@dataclass(frozen=True)
 class Batter:
     id: str
     name: str
     bats: str  # "L", "R", or "S" (switch)
     team: str
+    career_avg: float  # career batting average entering this season (no in-season data)
+    # In-season average vs. each pitcher hand. Not model features on their
+    # own -- see rank.py -- used only as the reference point for platoon
+    # delta (today's-hand average minus in-season overall average).
     season_avg: float
     season_avg_vs_lhp: float
     season_avg_vs_rhp: float
@@ -49,7 +40,10 @@ class Matchup:
     pitcher: Pitcher
     is_home: bool
     park_factor: float  # 1.0 = neutral, >1 favors hitters
-    recent_form: RecentForm
+    # 1-9, from the confirmed pre-game batting order. None when unknown
+    # (future days, or today's lineup not posted yet) -- rank.py imputes
+    # a neutral default rather than requiring this.
+    batting_order: int | None = None
 
 
 @dataclass(frozen=True)

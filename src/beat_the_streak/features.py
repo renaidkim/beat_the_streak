@@ -7,24 +7,26 @@ from dataclasses import dataclass
 from .models import Matchup
 
 LEAGUE_AVG_AVG = 0.245  # rough MLB league-average batting average, used as a prior
-RECENT_FORM_WINDOW = 10  # games
+
+# Imputed when a matchup's batting order slot isn't known (future days,
+# or today's lineup not posted yet) -- middle of the order, roughly
+# neutral. Matches the fallback used when the model was backtested (see
+# scripts/fit_hit_probability_model.py), so live behavior on an unknown
+# slot matches what was actually validated.
+DEFAULT_BATTING_ORDER = 5.0
 
 
 @dataclass(frozen=True)
 class BatterFeatures:
-    season_avg: float
-    recent_form_avg: float  # AVG over the last RECENT_FORM_WINDOW games
-    games_of_recent_data: int
-    platoon_avg: float  # season AVG vs today's pitcher's throwing hand
+    career_avg: float
+    platoon_delta: float  # today's-pitcher-hand average minus in-season overall average
     pitcher_oba_against: float
     park_factor: float
     is_home: bool
+    batting_order: float  # 1-9, or DEFAULT_BATTING_ORDER when unknown
 
 
 def build_features(matchup: Matchup) -> BatterFeatures:
-    form = matchup.recent_form
-    recent_form_avg = form.avg if form.avg is not None else matchup.batter.season_avg
-
     platoon_avg = (
         matchup.batter.season_avg_vs_lhp
         if matchup.pitcher.throws == "L"
@@ -32,11 +34,12 @@ def build_features(matchup: Matchup) -> BatterFeatures:
     )
 
     return BatterFeatures(
-        season_avg=matchup.batter.season_avg,
-        recent_form_avg=recent_form_avg,
-        games_of_recent_data=form.games_played,
-        platoon_avg=platoon_avg,
+        career_avg=matchup.batter.career_avg,
+        platoon_delta=platoon_avg - matchup.batter.season_avg,
         pitcher_oba_against=matchup.pitcher.oba_against,
         park_factor=matchup.park_factor,
         is_home=matchup.is_home,
+        batting_order=float(matchup.batting_order)
+        if matchup.batting_order is not None
+        else DEFAULT_BATTING_ORDER,
     )

@@ -8,7 +8,7 @@ game (pick 1-2 batters/day who you think will record a hit).
 
 1. **Data layer** (`beat_the_streak/data.py`) — pulls one `Matchup` per
    starting batter for the day: the batter, the opposing probable pitcher,
-   home/away, park factor, and the batter's recent form.
+   home/away, park factor, and the batter's lineup slot (1-9) when known.
    - `MlbStatsApiSource` hits the live public MLB Stats API
      (`statsapi.mlb.com`), validated against live traffic. It uses each
      game's confirmed batting order once the boxscore posts it, and falls
@@ -29,16 +29,19 @@ game (pick 1-2 batters/day who you think will record a hit).
      as a "TBD" badge and called out in that pick's reasons) so the page
      still has something useful to look at before starters are set —
      just revisit closer to game time as real lineups and starters post.
-2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into a
-   handful of signals: season average, last-10-games form, the platoon
-   split (average specifically vs. today's opposing pitcher hand), the
-   opposing pitcher's average-against, park factor, home/away.
-3. **Ranking** (`beat_the_streak/rank.py`) — a logistic regression, fit on
-   a real season of outcomes, predicts P(hit) directly from those signals.
-   See [Model backtest](#model-backtest) below for why it looks like this
-   and not like a hand-tuned formula. Picking the top N avoids selecting
-   two batters who face the *same* pitcher, since their outcomes are
-   correlated — one shutdown pitching performance sinks both picks at once.
+2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into six
+   signals: career batting average entering the season, platoon delta
+   (average vs. today's opposing pitcher hand, minus in-season overall
+   average), the opposing pitcher's average-against, park factor,
+   home/away, and batting order slot.
+3. **Ranking** (`beat_the_streak/rank.py`) — a gradient-boosted model, fit
+   on a real season of outcomes, predicts P(hit) directly from those
+   signals. See [Model backtest](#model-backtest) below for the two
+   rounds of testing that produced this specific feature set and model
+   type — it did not start out looking like this. Picking the top N
+   avoids selecting two batters who face the *same* pitcher, since their
+   outcomes are correlated — one shutdown pitching performance sinks both
+   picks at once.
 4. **CLI** (`beat_the_streak/cli.py`) — prints the ranked slate and the
    recommended picks.
 
@@ -122,26 +125,97 @@ direction but are individually noisy at this sample size (~14k
 batter-games); they still add value combined, just don't over-trust any
 one of them alone.
 
-Two concrete changes came out of this and are now shipped:
+Two concrete changes came out of that first round: `rank.py` switched to
+running the fitted logistic regression directly (predicting the per-game
+probability, no more per-at-bat-to-per-game conversion), and real platoon
+splits got wired into `MlbStatsApiSource` (it had been falling back to
+season average for both hands) — the backtest is what justified
+prioritizing that fix, since platoon was one of only two features the
+bootstrap called reliable.
 
-- **`rank.py` now runs the fitted logistic regression directly**
-  (coefficients in `data/hit_probability_model.json`, loaded at import
-  time — no runtime ML dependency, it's just `sigmoid(intercept +
-  Σ coef·feature)`), predicting the per-game probability directly instead
-  of a per-at-bat rate converted via the `1-(1-p)^4` formula. Live output
-  is visibly better-calibrated: predicted probabilities on a real slate
-  now span roughly 60-76% instead of 53-84%.
-- **Real platoon splits are now wired into `MlbStatsApiSource`** (batched
-  into the existing per-batter stats call via `sitCodes=[vl,vr]`, no
-  extra requests) instead of falling back to season average for both
-  hands. This was a documented known gap before; the backtest is what
-  justified prioritizing it — it's one of only two features the bootstrap
-  called reliable.
+### Round two: career average, batting order, and gradient boosting
+
+Round one still only barely beat the naive baseline (AUC 0.541, log loss
+0.6502 vs. 0.6520). Asked directly "is this actually working, and can it
+be improved," the honest first step was testing more of the data the
+Stats API actually has available: a batter's **career average** entering
+the season (multi-year, not just this season — via `yearByYear` hitting
+stats), and each batter's **batting order slot** that game (1-9, from the
+same boxscore call already used for confirmed lineups, just previously
+discarded). Both required pulling boxscores for essentially the full 2025
+season (~2,400 games) to reconstruct point-in-time.
+
+**Both turned out to matter a lot — enough to change what the model
+should even be:**
+
+- `career_avg` came back with the single largest, most bootstrap-stable
+  coefficient of any feature (bigger than park factor). Makes sense in
+  hindsight: a multi-year sample is a far more reliable estimate of a
+  hitter's true talent than anything from one partial season.
+- `batting_order` was the *most precisely estimated* coefficient in the
+  whole model (std/mean ratio far tighter than any other feature) and
+  correctly signed — batting higher in the order predicts more hits, both
+  because better hitters bat higher and because they get more plate
+  appearances per game.
+- With `career_avg` in the model, **season average and last-10-games form
+  added zero independent predictive power** — tested explicitly (4
+  feature-set variants, holding everything else fixed): including or
+  excluding them changed holdout log loss by less than 0.0002. They were
+  dropped rather than kept for appearances. Once you know a hitter's true
+  long-run talent level, this season's hot streak or cold spell isn't
+  telling you anything more about tonight.
+
+That called for retesting *how* the features get combined, not just which
+ones: a gradient-boosted tree (`HistGradientBoostingClassifier`) was
+tested against logistic regression on the same trimmed 6-feature set, and
+won cleanly across every metric — reproducibly (identical result across 4
+random seeds, so not a lucky fit):
+
+| Model | Log loss | Brier | AUC |
+| :--- | :--- | :--- | :--- |
+| Naive baseline | 0.6520 | 0.2297 | 0.500 |
+| Round-one logistic regression (6 features) | 0.6502 | 0.2289 | 0.541 |
+| Round-two logistic regression (career avg + order) | 0.6473 | 0.2276 | 0.563 |
+| **Round-two gradient boosting (shipped)** | **0.6461** | **0.2270** | **0.566** |
+
+**The gradient-boosted model initially had a real problem**, though, that
+plain unit tests caught before it shipped: point-checking individual
+matchups (not just aggregate holdout metrics) showed it predicting a
+*tougher* pitcher (.200 average-against) as *more* hittable than a weak
+one (.310), and a career .210 hitter above a career .320 hitter — flatly
+backwards, and contradicting the same bootstrap that had just confirmed
+those features' correct direction. A flexible tree model can do this in
+regions of feature space with sparse training data, even while scoring
+well in aggregate. Fixed with `monotonic_cst` constraints (`career_avg`,
+`pitcher_oba_against`, `park_factor` forced non-decreasing;
+`batting_order` non-increasing — every one of these is both basic
+baseball logic and what the linear model already confirmed) — cost about
+0.001 of holdout log loss, in exchange for ruling out backwards
+predictions entirely. `is_home` and `platoon_delta` are left
+unconstrained since neither showed a fully reliable direction; platoon
+delta in particular turned out to be conditionally important (matters a
+lot in some matchup contexts, not at all in others) rather than a
+uniform effect, which the tree model can represent and a linear one can't.
+
+Net result: predicted probabilities on a real slate that used to swing
+53-84% (round one) now sit in a tighter, better-calibrated ~60-76% band,
+and the actual #1 picks now look like what a baseball person would expect
+— a leadoff-hitting star at Coors Field outranks a bench bat, not the
+other way around.
+
+`rank.py` loads whichever model type `scripts/fit_hit_probability_model.py`
+last produced (`data/hit_probability_model.json` for metadata/feature
+order, plus `data/hit_probability_model.pkl` for a gradient-boosting
+model specifically) — logistic regression needs no runtime ML dependency,
+but shipping gradient boosting does: scikit-learn and joblib are now
+*runtime* dependencies (`requirements.txt`), not just for the offline
+fitting script. That's a real added weight (~100MB+) for what was a
+near-zero-dependency app; it was judged worth it because the performance
+gain was consistent and reproducible, not marginal or mixed.
 
 Rerun `python scripts/fit_hit_probability_model.py` (needs
-`requirements-analysis.txt`: pandas/numpy/scikit-learn, offline-analysis
-only, not a runtime dependency) once or twice a season to refresh the
-coefficients against a more recent year.
+`requirements-analysis.txt` for pandas/numpy on top of the runtime deps)
+once or twice a season to refresh against a more recent year.
 
 ## Hosted site
 
@@ -171,12 +245,12 @@ allowance on a private one, and each run here takes well under a minute).
 
 `MlbStatsApiSource` batches instead of doing one request per batter:
 roster/boxscore calls are made once per game, and player stats (season
-average + last-10-games form, or season pitching line) are fetched via
-chunked `/people?personIds=...` calls covering up to 50 players each,
-rather than one request per player. Measured against a real, completed
-15-game slate (270 starting batters): **23 HTTP requests, ~3.6 seconds**,
-versus roughly 850 requests the naive one-request-per-batter version would
-have made.
+average, platoon splits, career year-by-year, or season pitching line)
+are fetched via chunked `/people?personIds=...` calls covering up to 50
+players each, rather than one request per player. Measured against a
+real, completed 15-game slate (270 starting batters): **23 HTTP
+requests, ~2 seconds**, versus roughly 850 requests the naive
+one-request-per-batter version would have made.
 
 ## Usage
 
@@ -204,26 +278,40 @@ python scripts/generate_site.py --days 3 --out _site
 
 ## Known gaps
 
+- `data/hit_probability_model.pkl` is a joblib-pickled scikit-learn model,
+  which means it's only guaranteed loadable by the same major/minor
+  scikit-learn version it was fit with. `requirements.txt` pins
+  `scikit-learn>=1.4` without an upper bound; if a future install picks up
+  a materially newer scikit-learn and `joblib.load` starts failing, the
+  fix is to re-run `scripts/fit_hit_probability_model.py` with that
+  environment's scikit-learn to regenerate the pickle, not to chase
+  pickle-compatibility shims.
 - Park factors aren't split by batter handedness (some parks favor lefties
   or righties very differently — Yankee Stadium's short right field is
   the classic example).
 - The model was backtested on one season (2025) and ~14k batter-games
   from the ~100 highest-plate-appearance hitters; it hasn't been
   validated on part-time players, rookies with short track records, or a
-  second season. Season average and recent form individually had wide
-  bootstrap uncertainty (see [Model backtest](#model-backtest)) — the
-  fitted weights are a reasonable current estimate, not a settled result.
+  second season.
+- `platoon_delta` turned out to be conditionally important rather than
+  reliably important (see [Model backtest](#model-backtest)) — the
+  gradient-boosting model can represent "matters here, doesn't matter
+  there," but that also means it's the one feature whose effect isn't
+  well summarized by a single number, and the least-tested one by the
+  bootstrap.
+- `is_home` is carried as a feature but never showed a reliable direction
+  or magnitude across any round of testing; it's along for the ride more
+  than it's doing real work.
 - No accounting for a batter's own recent injury/rest status, or same-day
   lineup changes after prediction time.
-- **Batting order position isn't a feature yet.** Leadoff-type hitters
-  reliably get more plate appearances per game than the #9 spot, which
-  should matter for hit probability independent of who's hitting — and
-  it's cheap to add: the confirmed-lineup boxscore call already returns
-  each starter's order position, just unused right now. Worth backtesting
-  the same way `pitcher_oba_against` and platoon were (see
-  [Model backtest](#model-backtest)) before trusting it, since it needs
-  its own per-game data pull (order position isn't in the season gameLog
-  endpoint the backtest currently uses) — planned, not done yet.
+- The monotonic constraints (career average, pitcher quality, and park
+  factor forced non-decreasing; batting order non-increasing) are
+  asserted from baseball domain knowledge and the linear model's
+  bootstrap-confirmed directions, not independently re-derived by the
+  gradient-boosting fit itself — a deliberate choice (see
+  [Model backtest](#model-backtest)) to keep the model from being able to
+  contradict signal it already validated, but worth knowing that's what
+  they are.
 
 ## Tests
 

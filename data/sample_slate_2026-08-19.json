@@ -9,7 +9,8 @@
         "team": "Riverside Reds",
         "season_avg": 0.291,
         "season_avg_vs_lhp": 0.278,
-        "season_avg_vs_rhp": 0.298
+        "season_avg_vs_rhp": 0.298,
+        "career_avg": 0.284
       },
       "pitcher": {
         "id": "p01",
@@ -20,11 +21,7 @@
       },
       "is_home": true,
       "park_factor": 1.08,
-      "recent_form": {
-        "games_played": 10,
-        "at_bats": 39,
-        "hits": 17
-      }
+      "batting_order": 3
     },
     {
       "batter": {
@@ -34,7 +31,8 @@
         "team": "Riverside Reds",
         "season_avg": 0.264,
         "season_avg_vs_lhp": 0.221,
-        "season_avg_vs_rhp": 0.281
+        "season_avg_vs_rhp": 0.281,
+        "career_avg": 0.259
       },
       "pitcher": {
         "id": "p01",
@@ -45,11 +43,7 @@
       },
       "is_home": true,
       "park_factor": 1.08,
-      "recent_form": {
-        "games_played": 10,
-        "at_bats": 37,
-        "hits": 6
-      }
+      "batting_order": 6
     },
     {
       "batter": {
@@ -59,7 +53,8 @@
         "team": "Prairie City Bison",
         "season_avg": 0.312,
         "season_avg_vs_lhp": 0.301,
-        "season_avg_vs_rhp": 0.318
+        "season_avg_vs_rhp": 0.318,
+        "career_avg": 0.297
       },
       "pitcher": {
         "id": "p02",
@@ -70,11 +65,7 @@
       },
       "is_home": false,
       "park_factor": 0.94,
-      "recent_form": {
-        "games_played": 10,
-        "at_bats": 39,
-        "hits": 14
-      }
+      "batting_order": 2
     },
     {
       "batter": {
@@ -84,7 +75,8 @@
         "team": "Prairie City Bison",
         "season_avg": 0.256,
         "season_avg_vs_lhp": 0.268,
-        "season_avg_vs_rhp": 0.249
+        "season_avg_vs_rhp": 0.249,
+        "career_avg": 0.251
       },
       "pitcher": {
         "id": "p03",
@@ -95,11 +87,7 @@
       },
       "is_home": false,
       "park_factor": 1.02,
-      "recent_form": {
-        "games_played": 10,
-        "at_bats": 37,
-        "hits": 6
-      }
+      "batting_order": 8
     },
     {
       "batter": {
@@ -109,7 +97,8 @@
         "team": "Harbor Point Mariners II",
         "season_avg": 0.301,
         "season_avg_vs_lhp": 0.255,
-        "season_avg_vs_rhp": 0.319
+        "season_avg_vs_rhp": 0.319,
+        "career_avg": 0.288
       },
       "pitcher": {
         "id": "p04",
@@ -120,11 +109,7 @@
       },
       "is_home": true,
       "park_factor": 1.11,
-      "recent_form": {
-        "games_played": 10,
-        "at_bats": 40,
-        "hits": 15
-      }
+      "batting_order": 4
     },
     {
       "batter": {
@@ -134,7 +119,8 @@
         "team": "Cascade Timberwolves",
         "season_avg": 0.238,
         "season_avg_vs_lhp": 0.244,
-        "season_avg_vs_rhp": 0.234
+        "season_avg_vs_rhp": 0.234,
+        "career_avg": 0.243
       },
       "pitcher": {
         "id": "p05",
@@ -145,11 +131,7 @@
       },
       "is_home": false,
       "park_factor": 0.9,
-      "recent_form": {
-        "games_played": 10,
-        "at_bats": 36,
-        "hits": 4
-      }
+      "batting_order": 7
     },
     {
       "batter": {
@@ -159,7 +141,8 @@
         "team": "Cascade Timberwolves",
         "season_avg": 0.279,
         "season_avg_vs_lhp": 0.292,
-        "season_avg_vs_rhp": 0.271
+        "season_avg_vs_rhp": 0.271,
+        "career_avg": 0.271
       },
       "pitcher": {
         "id": "p05",
@@ -170,11 +153,7 @@
       },
       "is_home": false,
       "park_factor": 0.9,
-      "recent_form": {
-        "games_played": 10,
-        "at_bats": 38,
-        "hits": 11
-      }
+      "batting_order": 5
     },
     {
       "batter": {
@@ -184,7 +163,8 @@
         "team": "Sundown Valley Comets",
         "season_avg": 0.269,
         "season_avg_vs_lhp": 0.231,
-        "season_avg_vs_rhp": 0.284
+        "season_avg_vs_rhp": 0.284,
+        "career_avg": 0.262
       },
       "pitcher": {
         "id": "p06",
@@ -195,11 +175,7 @@
       },
       "is_home": true,
       "park_factor": 1.0,
-      "recent_form": {
-        "games_played": 4,
-        "at_bats": 15,
-        "hits": 5
-      }
+      "batting_order": 9
     }
   ]
 }

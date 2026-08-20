@@ -5,9 +5,10 @@ implementations are provided:
 
 - MlbStatsApiSource: hits the public MLB Stats API (statsapi.mlb.com).
   Validated against live traffic. Uses the boxscore's confirmed batting
-  order when it's been posted, falls back to the full active roster when
-  it hasn't, and batches player-stat lookups (chunked `/people?personIds=`
-  calls) instead of firing one request per batter per game.
+  order when it's been posted (also the source of each batter's lineup
+  slot), falls back to the full active roster when it hasn't, and
+  batches player-stat lookups (chunked `/people?personIds=` calls)
+  instead of firing one request per batter per game.
 - FixtureSource: reads a static JSON fixture from disk. Useful for
   development, tests, and demos without network access.
 
@@ -23,13 +24,22 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import requests
 
-from .features import LEAGUE_AVG_AVG, RECENT_FORM_WINDOW
-from .models import Batter, Matchup, Pitcher, RecentForm
+from .features import LEAGUE_AVG_AVG
+from .models import Batter, Matchup, Pitcher
 
 MLB_STATS_API_BASE = "https://statsapi.mlb.com/api/v1"
+
+# MLB's schedule is organized by "baseball day," which follows US Eastern
+# time (where the league office is), not UTC or wherever this process
+# happens to run -- a 10pm ET West Coast game is still "today" even
+# though it's past midnight UTC. Matters for deciding whether a boxscore
+# is worth fetching at all (see is_today below) and for the site
+# generator's day labels.
+EASTERN = ZoneInfo("America/New_York")
 
 # Rough league-average ERA, used only for the TBD-starter placeholder
 # below -- oba_against there comes from LEAGUE_AVG_AVG instead, since
@@ -61,10 +71,11 @@ class MlbStatsApiSource(DataSource):
 
     def get_matchups(self, date: str) -> list[Matchup]:
         games = self._get_schedule_with_probables(date)
+        season_year = int(date[:4])
 
-        # Pass 1: work out who's playing and who they're facing, without
-        # yet fetching per-player stats, so those can be batched afterward
-        # instead of fired one request at a time.
+        # Pass 1: work out who's playing (and their lineup slot, if known)
+        # and who they're facing, without yet fetching per-player stats,
+        # so those can be batched afterward instead of fired one at a time.
         game_matchups: list[dict[str, Any]] = []
         pitcher_ids: set[int] = set()
         batter_ids: set[int] = set()
@@ -72,7 +83,7 @@ class MlbStatsApiSource(DataSource):
         # Confirmed lineups only ever exist for games happening today;
         # skip the boxscore call entirely for future dates rather than
         # firing a request that's guaranteed to come back empty.
-        is_today = date == datetime.date.today().isoformat()
+        is_today = date == datetime.datetime.now(EASTERN).date().isoformat()
 
         for game in games:
             park_factor = self._get_park_factor(game["teams"]["home"]["team"]["id"])
@@ -81,7 +92,7 @@ class MlbStatsApiSource(DataSource):
                 team = game["teams"][side]["team"]
                 opp_pitcher_info = game["teams"][opponent_side].get("probablePitcher")
                 lineup = self._get_starting_batters(boxscore, side, team["id"])
-                batter_ids.update(lineup)
+                batter_ids.update(lineup.keys())
                 if opp_pitcher_info:
                     pitcher_id: int | str = opp_pitcher_info["id"]
                     pitcher_ids.add(pitcher_id)
@@ -94,13 +105,13 @@ class MlbStatsApiSource(DataSource):
                 game_matchups.append(
                     {
                         "pitcher_id": pitcher_id,
-                        "batter_ids": lineup,
+                        "lineup": lineup,  # batter_id -> slot (1-9) or None
                         "is_home": side == "home",
                         "park_factor": park_factor,
                     }
                 )
 
-        batters = self._get_batters(batter_ids)
+        batters = self._get_batters(batter_ids, season_year)
         pitchers = self._get_pitchers(pitcher_ids)
 
         matchups: list[Matchup] = []
@@ -112,18 +123,17 @@ class MlbStatsApiSource(DataSource):
                 pitcher = pitchers.get(pitcher_id)
             if pitcher is None:
                 continue
-            for batter_id in gm["batter_ids"]:
-                entry = batters.get(batter_id)
-                if entry is None:
+            for batter_id, slot in gm["lineup"].items():
+                batter = batters.get(batter_id)
+                if batter is None:
                     continue
-                batter, recent_form = entry
                 matchups.append(
                     Matchup(
                         batter=batter,
                         pitcher=pitcher,
                         is_home=gm["is_home"],
                         park_factor=gm["park_factor"],
-                        recent_form=recent_form,
+                        batting_order=slot,
                     )
                 )
         return matchups
@@ -148,14 +158,16 @@ class MlbStatsApiSource(DataSource):
 
     def _get_starting_batters(
         self, boxscore: dict[str, Any], side: str, team_id: int
-    ) -> list[int]:
-        batting_order = boxscore.get("teams", {}).get(side, {}).get("battingOrder") or []
-        if batting_order:
-            return list(batting_order)
+    ) -> dict[int, int | None]:
+        # The boxscore's battingOrder is a flat, ordered list of the 9
+        # starters' ids -- list position (1-indexed) is the lineup slot.
+        order_list = boxscore.get("teams", {}).get(side, {}).get("battingOrder") or []
+        if order_list:
+            return {batter_id: slot for slot, batter_id in enumerate(order_list, start=1)}
         # Lineup not posted yet (common well before game time): fall back
-        # to every position player on the active roster rather than
-        # skipping the team's batters entirely.
-        return self._get_roster_batters(team_id)
+        # to every position player on the active roster, with no known
+        # slot, rather than skipping the team's batters entirely.
+        return {bid: None for bid in self._get_roster_batters(team_id)}
 
     def _get_roster_batters(self, team_id: int) -> list[int]:
         if team_id in self._roster_cache:
@@ -175,8 +187,8 @@ class MlbStatsApiSource(DataSource):
         self._roster_cache[team_id] = batters
         return batters
 
-    def _get_batters(self, batter_ids: set[int]) -> dict[int, tuple[Batter, RecentForm]]:
-        result: dict[int, tuple[Batter, RecentForm]] = {}
+    def _get_batters(self, batter_ids: set[int], season_year: int) -> dict[int, Batter]:
+        result: dict[int, Batter] = {}
         for chunk in _chunks(sorted(batter_ids), PEOPLE_BATCH_SIZE):
             resp = self._session.get(
                 f"{MLB_STATS_API_BASE}/people",
@@ -184,8 +196,8 @@ class MlbStatsApiSource(DataSource):
                     "personIds": ",".join(str(i) for i in chunk),
                     "hydrate": (
                         "currentTeam,"
-                        "stats(group=[hitting],type=[season,lastXGames,statSplits],"
-                        f"limit={RECENT_FORM_WINDOW},sitCodes=[vl,vr])"
+                        "stats(group=[hitting],type=[season,statSplits,yearByYear],"
+                        "sitCodes=[vl,vr])"
                     ),
                 },
                 timeout=20,
@@ -193,14 +205,15 @@ class MlbStatsApiSource(DataSource):
             resp.raise_for_status()
             for person in resp.json().get("people", []):
                 season_stat = _stat_split(person, "season")
-                recent_stat = _stat_split(person, "lastXGames")
                 platoon_splits = _platoon_splits(person)
                 season_avg = float(season_stat.get("avg") or ".250")
-                batter = Batter(
+                career_avg = _career_avg_entering_season(person, season_year)
+                result[person["id"]] = Batter(
                     id=str(person["id"]),
                     name=person["fullName"],
                     bats=person.get("batSide", {}).get("code", "R"),
                     team=person.get("currentTeam", {}).get("name", ""),
+                    career_avg=career_avg if career_avg is not None else season_avg,
                     season_avg=season_avg,
                     # Falls back to season average when a split has too few
                     # at-bats to report an avg (early season, part-time
@@ -208,12 +221,6 @@ class MlbStatsApiSource(DataSource):
                     season_avg_vs_lhp=float(platoon_splits.get("vl", {}).get("avg") or season_avg),
                     season_avg_vs_rhp=float(platoon_splits.get("vr", {}).get("avg") or season_avg),
                 )
-                recent_form = RecentForm(
-                    games_played=int(recent_stat.get("gamesPlayed", 0)),
-                    at_bats=int(recent_stat.get("atBats", 0)),
-                    hits=int(recent_stat.get("hits", 0)),
-                )
-                result[person["id"]] = (batter, recent_form)
         return result
 
     def _get_pitchers(self, pitcher_ids: set[int]) -> dict[int, Pitcher]:
@@ -282,6 +289,24 @@ def _platoon_splits(person: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _career_avg_entering_season(person: dict[str, Any], season_year: int) -> float | None:
+    """Sum of hits/at-bats across every season strictly before season_year,
+    from the person's yearByYear stat group. None if there isn't one
+    (a rookie with no prior-season at-bats) -- callers fall back to
+    in-season average in that case.
+    """
+    ab = hits = 0
+    for stat_group in person.get("stats", []):
+        if stat_group.get("type", {}).get("displayName") != "yearByYear":
+            continue
+        for split in stat_group.get("splits", []):
+            season = int(split.get("season", season_year))
+            if season < season_year:
+                ab += int(split["stat"].get("atBats", 0))
+                hits += int(split["stat"].get("hits", 0))
+    return hits / ab if ab > 0 else None
+
+
 def _placeholder_pitcher(tbd_id: str) -> Pitcher:
     """Stand-in for a game whose starter hasn't been announced yet.
 
@@ -321,14 +346,13 @@ class FixtureSource(DataSource):
         for entry in payload["matchups"]:
             batter = Batter(**entry["batter"])
             pitcher = Pitcher(**entry["pitcher"])
-            recent_form = RecentForm(**entry["recent_form"])
             matchups.append(
                 Matchup(
                     batter=batter,
                     pitcher=pitcher,
                     is_home=entry["is_home"],
                     park_factor=entry["park_factor"],
-                    recent_form=recent_form,
+                    batting_order=entry.get("batting_order"),
                 )
             )
         return matchups
