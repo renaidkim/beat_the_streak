@@ -4,12 +4,20 @@ on:
   # Manual "Run workflow" button on the Actions tab (or the GitHub mobile
   # app) -- this is the on-demand refresh, e.g. once new lineups post.
   workflow_dispatch: {}
-  # Baseline refresh so the page isn't stale if nobody triggers it by
-  # hand. Every 2 hours, all day (UTC) -- cheap either way: ~12
-  # short runs/day is well under the free-tier minutes even on a private
-  # repo, and unlimited on a public one. Tune the cron to taste.
+  # Baseline refresh so the page is current before it's actually looked
+  # at, rather than stale until someone triggers it by hand. Timed
+  # around actual usage: once in the morning as lineups start posting,
+  # and again shortly before the daily lunch-hour (12-1pm Pacific)
+  # check-in. GitHub Actions cron is UTC-only with no timezone/DST
+  # support, so these are pinned to Pacific *Daylight* Time (UTC-7,
+  # roughly March-November); during Pacific Standard Time (UTC-8,
+  # roughly November-March) both runs land an hour earlier than the
+  # label says (5am/10:30am PST instead of 6am/11:30am) until this is
+  # manually shifted by an hour for the season. The on-demand button
+  # covers anything outside these two windows either way.
   schedule:
-    - cron: "0 */2 * * *"
+    - cron: "0 13 * * *"   # ~6:00am Pacific (PDT)
+    - cron: "30 18 * * *"  # ~11:30am Pacific (PDT)
 
 permissions:
   contents: read

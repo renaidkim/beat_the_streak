@@ -441,9 +441,15 @@ runs it and publishes the result to GitHub Pages:
   in-page button that triggers the run without leaving the page would
   need a token embedded in the public page — not done, since anyone
   viewing the page could then use it to burn your Actions minutes.
-- **On a schedule**, as a baseline so the page isn't stale if nobody
-  triggers it by hand: every 2 hours, all day. Edit the `cron` line in
-  the workflow file to change the cadence.
+- **On a schedule**, as a baseline so the page is current before it's
+  actually looked at. Twice a day, timed around actual usage: ~6:00am
+  and ~11:30am Pacific (before lineups are typically checked, and again
+  before the lunch-hour check-in). GitHub Actions cron has no timezone
+  support, so the two `cron` lines in the workflow file are pinned to
+  Pacific Daylight Time (UTC-7) and drift an hour during Pacific
+  Standard Time (roughly November-March) until manually shifted for the
+  season -- see the comment above them in `.github/workflows/publish.yml`.
+  Edit those lines to change the cadence.
 - The "Generated at" timestamp on the page is Pacific time. The
   Today/Tomorrow/day-after-tomorrow *date boundaries* stay on US
   Eastern internally regardless of the viewer's timezone, though —
