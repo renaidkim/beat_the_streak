@@ -22,12 +22,8 @@ class BatterFeatures:
 
 
 def build_features(matchup: Matchup) -> BatterFeatures:
-    recent = matchup.recent_logs[-RECENT_FORM_WINDOW:]
-    recent_at_bats = sum(log.at_bats for log in recent)
-    recent_hits = sum(log.hits for log in recent)
-    recent_form_avg = (
-        recent_hits / recent_at_bats if recent_at_bats > 0 else matchup.batter.season_avg
-    )
+    form = matchup.recent_form
+    recent_form_avg = form.avg if form.avg is not None else matchup.batter.season_avg
 
     platoon_avg = (
         matchup.batter.season_avg_vs_lhp
@@ -38,7 +34,7 @@ def build_features(matchup: Matchup) -> BatterFeatures:
     return BatterFeatures(
         season_avg=matchup.batter.season_avg,
         recent_form_avg=recent_form_avg,
-        games_of_recent_data=len(recent),
+        games_of_recent_data=form.games_played,
         platoon_avg=platoon_avg,
         pitcher_oba_against=matchup.pitcher.oba_against,
         park_factor=matchup.park_factor,

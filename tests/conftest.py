@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from beat_the_streak.models import Batter, GameLog, Matchup, Pitcher
+from beat_the_streak.models import Batter, Matchup, Pitcher, RecentForm
 
 
 def make_batter(**overrides) -> Batter:
@@ -25,11 +25,15 @@ def make_pitcher(**overrides) -> Pitcher:
     return Pitcher(**defaults)
 
 
-def make_logs(hit_pattern: list[int], at_bats: int = 4) -> list[GameLog]:
-    return [
-        GameLog(date=f"2026-08-{i + 1:02d}", at_bats=at_bats, hits=hits)
-        for i, hits in enumerate(hit_pattern)
-    ]
+def make_recent_form(hit_pattern: list[int], at_bats_per_game: int = 4) -> RecentForm:
+    """Build a RecentForm aggregate from a per-game hit pattern, e.g.
+    [1, 0, 1] = 3 games, one hit in games 1 and 3, none in game 2.
+    """
+    return RecentForm(
+        games_played=len(hit_pattern),
+        at_bats=len(hit_pattern) * at_bats_per_game,
+        hits=sum(hit_pattern),
+    )
 
 
 def make_matchup(**overrides) -> Matchup:
@@ -38,7 +42,7 @@ def make_matchup(**overrides) -> Matchup:
         pitcher=make_pitcher(),
         is_home=True,
         park_factor=1.0,
-        recent_logs=make_logs([1, 1, 0, 1, 0, 1, 1, 0, 1, 1]),
+        recent_form=make_recent_form([1, 1, 0, 1, 0, 1, 1, 0, 1, 1]),
     )
     defaults.update(overrides)
     return Matchup(**defaults)

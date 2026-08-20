@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -15,16 +15,16 @@ class Pitcher:
 
 
 @dataclass(frozen=True)
-class GameLog:
-    """One game's batting line for a single batter."""
+class RecentForm:
+    """Aggregate batting line over a batter's last N games (not per-game)."""
 
-    date: str  # ISO date
+    games_played: int
     at_bats: int
     hits: int
 
     @property
-    def got_a_hit(self) -> bool:
-        return self.hits > 0
+    def avg(self) -> float | None:
+        return self.hits / self.at_bats if self.at_bats > 0 else None
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class Matchup:
     pitcher: Pitcher
     is_home: bool
     park_factor: float  # 1.0 = neutral, >1 favors hitters
-    recent_logs: list[GameLog] = field(default_factory=list)
+    recent_form: RecentForm
 
 
 @dataclass(frozen=True)

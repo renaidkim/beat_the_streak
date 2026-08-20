@@ -7,11 +7,15 @@ game (pick 1-2 batters/day who you think will record a hit).
 ## How it works
 
 1. **Data layer** (`beat_the_streak/data.py`) — pulls one `Matchup` per
-   probable batter for the day: the batter, the opposing probable pitcher,
-   home/away, park factor, and the batter's recent game logs.
+   starting batter for the day: the batter, the opposing probable pitcher,
+   home/away, park factor, and the batter's recent form.
    - `MlbStatsApiSource` hits the live public MLB Stats API
-     (`statsapi.mlb.com`). Real endpoints, no API key needed — but it does
-     require outbound network access to that host.
+     (`statsapi.mlb.com`), validated against live traffic. It uses each
+     game's confirmed batting order once the boxscore posts it, and falls
+     back to the full active roster for games where the lineup isn't out
+     yet — so a slate with only a few confirmed lineups still produces
+     predictions for everyone else instead of skipping them. See
+     [Performance](#performance) for how it keeps request volume down.
    - `FixtureSource` reads a static JSON file instead, for offline dev,
      tests, and demos (`data/sample_slate_2026-08-19.json`).
 2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into a
@@ -33,22 +37,49 @@ point. Swapping `score_matchup` for a model trained on historical
 outcomes (logistic regression / gradient boosting over these same features)
 is the natural next step once there's a results log to train on.
 
-## A note on data access
+## Park factor: does it actually matter?
 
-`MlbStatsApiSource` is validated against live traffic (`statsapi.mlb.com`)
-— the schedule/probables, pitcher, batter, and game-log endpoints all
-return the shapes the code expects.
+Checked empirically before trusting it (`scripts/refresh_park_factors.py`):
+for each team, the ratio of that team's own hitters' batting average at
+home vs. on the road, averaged over the last 3 completed seasons (using
+the same team's hitters home vs. away cancels out their own quality,
+isolating the park). Result, from `data/park_factors.json`:
 
-Known gaps in the live source, called out in the code:
-- No real vs-pitcher-hand split endpoint is wired up yet (falls back to
-  season average).
-- No confirmed-lineup source (uses full active roster, not today's
-  starting 9 — swap in a boxscore poll closer to game time).
-- No park-factor table (defaults to neutral, 1.0).
-- One HTTP request per batter per game (roster → per-batter person + game
-  log calls, all serial). For a full ~15-game slate with full rosters,
-  that's several hundred requests run one at a time — noticeably slow, and
-  worth parallelizing or caching before relying on this daily.
+| Park | Factor |
+| :--- | :--- |
+| Colorado Rockies (Coors Field) | 1.245 |
+| Kansas City Royals | 1.096 |
+| Boston Red Sox | 1.082 |
+| *(24 more teams)* | 0.96 – 1.08 |
+| Seattle Mariners | 0.915 |
+
+Verdict: yes, it's worth including, but the effect is concentrated in a
+handful of extreme parks rather than spread evenly. Coors Field alone is
+one of the largest single factors anywhere in the model — a +24.5%
+per-at-bat boost dwarfs most form/matchup differences — and it shows up
+immediately in live output: every top pick on a day the Rockies play at
+home is a Coors Field batter. Seattle's marine layer suppresses hits by
+about 8.5%. For the other ~28 teams the gap from neutral is mostly 1-8%,
+smaller than a lot of the other signals in the model, so don't expect park
+to be the deciding factor most days — just the occasional day it's the
+whole story.
+
+This 3-year home/away ratio is a deliberately simple proxy (no split by
+handedness or batted-ball type, doesn't control for the mix of opponents
+each team's home vs. road slate happened to include) — good enough to
+weight a heuristic model, not research-grade. Re-run the script once or
+twice a season; park effects don't shift week to week.
+
+## Performance
+
+`MlbStatsApiSource` batches instead of doing one request per batter:
+roster/boxscore calls are made once per game, and player stats (season
+average + last-10-games form, or season pitching line) are fetched via
+chunked `/people?personIds=...` calls covering up to 50 players each,
+rather than one request per player. Measured against a real, completed
+15-game slate (270 starting batters): **23 HTTP requests, ~3.6 seconds**,
+versus roughly 850 requests the naive one-request-per-batter version would
+have made.
 
 ## Usage
 
@@ -61,7 +92,18 @@ beat-the-streak 2026-08-19 --source mlbapi
 # Offline, against the bundled sample fixture:
 beat-the-streak 2026-08-19 --source fixture \
     --fixture-path data/sample_slate_2026-08-19.json --picks 2
+
+# Refresh the park-factor table (run once or twice a season):
+python scripts/refresh_park_factors.py
 ```
+
+## Known gaps
+
+- No real vs-pitcher-hand split endpoint is wired up yet for batters
+  (falls back to season average).
+- Park factors aren't split by batter handedness (some parks favor lefties
+  or righties very differently — Yankee Stadium's short right field is
+  the classic example).
 
 ## Tests
 

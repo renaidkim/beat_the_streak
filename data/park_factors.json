@@ -1,0 +1,152 @@
+{
+  "108": {
+    "name": "Los Angeles Angels",
+    "park_factor": 0.98,
+    "seasons_used": 3
+  },
+  "109": {
+    "name": "Arizona Diamondbacks",
+    "park_factor": 1.074,
+    "seasons_used": 3
+  },
+  "110": {
+    "name": "Baltimore Orioles",
+    "park_factor": 1.008,
+    "seasons_used": 3
+  },
+  "111": {
+    "name": "Boston Red Sox",
+    "park_factor": 1.082,
+    "seasons_used": 3
+  },
+  "112": {
+    "name": "Chicago Cubs",
+    "park_factor": 0.959,
+    "seasons_used": 3
+  },
+  "113": {
+    "name": "Cincinnati Reds",
+    "park_factor": 1.012,
+    "seasons_used": 3
+  },
+  "114": {
+    "name": "Cleveland Guardians",
+    "park_factor": 1.016,
+    "seasons_used": 3
+  },
+  "115": {
+    "name": "Colorado Rockies",
+    "park_factor": 1.245,
+    "seasons_used": 3
+  },
+  "116": {
+    "name": "Detroit Tigers",
+    "park_factor": 1.047,
+    "seasons_used": 3
+  },
+  "117": {
+    "name": "Houston Astros",
+    "park_factor": 0.988,
+    "seasons_used": 3
+  },
+  "118": {
+    "name": "Kansas City Royals",
+    "park_factor": 1.096,
+    "seasons_used": 3
+  },
+  "119": {
+    "name": "Los Angeles Dodgers",
+    "park_factor": 1.006,
+    "seasons_used": 3
+  },
+  "120": {
+    "name": "Washington Nationals",
+    "park_factor": 1.028,
+    "seasons_used": 3
+  },
+  "121": {
+    "name": "New York Mets",
+    "park_factor": 0.997,
+    "seasons_used": 3
+  },
+  "133": {
+    "name": "Athletics",
+    "park_factor": 0.996,
+    "seasons_used": 3
+  },
+  "134": {
+    "name": "Pittsburgh Pirates",
+    "park_factor": 1.074,
+    "seasons_used": 3
+  },
+  "135": {
+    "name": "San Diego Padres",
+    "park_factor": 0.977,
+    "seasons_used": 3
+  },
+  "136": {
+    "name": "Seattle Mariners",
+    "park_factor": 0.915,
+    "seasons_used": 3
+  },
+  "137": {
+    "name": "San Francisco Giants",
+    "park_factor": 1.035,
+    "seasons_used": 3
+  },
+  "138": {
+    "name": "St. Louis Cardinals",
+    "park_factor": 1.044,
+    "seasons_used": 3
+  },
+  "139": {
+    "name": "Tampa Bay Rays",
+    "park_factor": 1.011,
+    "seasons_used": 3
+  },
+  "140": {
+    "name": "Texas Rangers",
+    "park_factor": 1.009,
+    "seasons_used": 3
+  },
+  "141": {
+    "name": "Toronto Blue Jays",
+    "park_factor": 1.001,
+    "seasons_used": 3
+  },
+  "142": {
+    "name": "Minnesota Twins",
+    "park_factor": 1.073,
+    "seasons_used": 3
+  },
+  "143": {
+    "name": "Philadelphia Phillies",
+    "park_factor": 1.066,
+    "seasons_used": 3
+  },
+  "144": {
+    "name": "Atlanta Braves",
+    "park_factor": 1.019,
+    "seasons_used": 3
+  },
+  "145": {
+    "name": "Chicago White Sox",
+    "park_factor": 1.012,
+    "seasons_used": 3
+  },
+  "146": {
+    "name": "Miami Marlins",
+    "park_factor": 1.025,
+    "seasons_used": 3
+  },
+  "147": {
+    "name": "New York Yankees",
+    "park_factor": 0.963,
+    "seasons_used": 3
+  },
+  "158": {
+    "name": "Milwaukee Brewers",
+    "park_factor": 0.953,
+    "seasons_used": 3
+  }
+}

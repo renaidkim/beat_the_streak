@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from beat_the_streak.rank import pick_top, rank_matchups, score_matchup
 
-from .conftest import make_batter, make_logs, make_matchup, make_pitcher
+from .conftest import make_batter, make_matchup, make_pitcher, make_recent_form
 
 
 def test_hit_probability_is_between_0_and_1():
@@ -11,8 +11,8 @@ def test_hit_probability_is_between_0_and_1():
 
 
 def test_hot_recent_form_scores_higher_than_cold_form():
-    hot = make_matchup(recent_logs=make_logs([1] * 10))
-    cold = make_matchup(recent_logs=make_logs([0] * 10))
+    hot = make_matchup(recent_form=make_recent_form([1] * 10))
+    cold = make_matchup(recent_form=make_recent_form([0] * 10))
     assert score_matchup(hot).hit_probability > score_matchup(cold).hit_probability
 
 
@@ -35,15 +35,15 @@ def test_hitter_friendly_park_raises_probability():
 
 
 def test_thin_recent_sample_is_shrunk_toward_season_avg():
-    # A single 4-for-4 game shouldn't swing the estimate as much as a full
-    # window of the same rate would.
+    # A 4-game hot streak shouldn't swing the estimate as much as the same
+    # rate sustained over a full 10-game window would.
     thin_hot = make_matchup(
         batter=make_batter(season_avg=0.230, season_avg_vs_lhp=0.230, season_avg_vs_rhp=0.230),
-        recent_logs=make_logs([1] * 4, at_bats=1),  # 1 game, 4 AB, 4 hits -> 1.000
+        recent_form=make_recent_form([1] * 4),  # 4 games at 1.000
     )
     full_hot = make_matchup(
         batter=make_batter(season_avg=0.230, season_avg_vs_lhp=0.230, season_avg_vs_rhp=0.230),
-        recent_logs=make_logs([1] * 40, at_bats=1)[:10],
+        recent_form=make_recent_form([1] * 10),  # 10 games at 1.000
     )
     assert (
         score_matchup(thin_hot).hit_probability
@@ -52,8 +52,8 @@ def test_thin_recent_sample_is_shrunk_toward_season_avg():
 
 
 def test_rank_matchups_sorts_descending():
-    hot = make_matchup(recent_logs=make_logs([1] * 10))
-    cold = make_matchup(recent_logs=make_logs([0] * 10))
+    hot = make_matchup(recent_form=make_recent_form([1] * 10))
+    cold = make_matchup(recent_form=make_recent_form([0] * 10))
     ranked = rank_matchups([cold, hot])
     assert ranked[0].hit_probability >= ranked[1].hit_probability
 
@@ -61,15 +61,15 @@ def test_rank_matchups_sorts_descending():
 def test_pick_top_avoids_same_pitcher_by_default():
     shared_pitcher = make_pitcher(id="shared")
     best = make_matchup(
-        batter=make_batter(id="b1"), pitcher=shared_pitcher, recent_logs=make_logs([1] * 10)
+        batter=make_batter(id="b1"), pitcher=shared_pitcher, recent_form=make_recent_form([1] * 10)
     )
     second_best_same_pitcher = make_matchup(
-        batter=make_batter(id="b2"), pitcher=shared_pitcher, recent_logs=make_logs([1, 0] * 5)
+        batter=make_batter(id="b2"), pitcher=shared_pitcher, recent_form=make_recent_form([1, 0] * 5)
     )
     third_best_different_pitcher = make_matchup(
         batter=make_batter(id="b3"),
         pitcher=make_pitcher(id="other"),
-        recent_logs=make_logs([1, 0, 0, 1] * 2, at_bats=4),
+        recent_form=make_recent_form([1, 0, 0, 1] * 2),
     )
     ranked = rank_matchups(
         [best, second_best_same_pitcher, third_best_different_pitcher]

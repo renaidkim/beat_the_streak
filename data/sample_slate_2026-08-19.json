@@ -20,58 +20,11 @@
       },
       "is_home": true,
       "park_factor": 1.08,
-      "recent_logs": [
-        {
-          "date": "2026-08-09",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-10",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-11",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-12",
-          "at_bats": 5,
-          "hits": 3
-        },
-        {
-          "date": "2026-08-13",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-14",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-15",
-          "at_bats": 3,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 4,
-          "hits": 2
-        }
-      ]
+      "recent_form": {
+        "games_played": 10,
+        "at_bats": 39,
+        "hits": 17
+      }
     },
     {
       "batter": {
@@ -92,58 +45,11 @@
       },
       "is_home": true,
       "park_factor": 1.08,
-      "recent_logs": [
-        {
-          "date": "2026-08-09",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-10",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-11",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-12",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-13",
-          "at_bats": 3,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-14",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-15",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 3,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 4,
-          "hits": 1
-        }
-      ]
+      "recent_form": {
+        "games_played": 10,
+        "at_bats": 37,
+        "hits": 6
+      }
     },
     {
       "batter": {
@@ -164,58 +70,11 @@
       },
       "is_home": false,
       "park_factor": 0.94,
-      "recent_logs": [
-        {
-          "date": "2026-08-09",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-10",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-11",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-12",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-13",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-14",
-          "at_bats": 5,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-15",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 4,
-          "hits": 1
-        }
-      ]
+      "recent_form": {
+        "games_played": 10,
+        "at_bats": 39,
+        "hits": 14
+      }
     },
     {
       "batter": {
@@ -236,58 +95,11 @@
       },
       "is_home": false,
       "park_factor": 1.02,
-      "recent_logs": [
-        {
-          "date": "2026-08-09",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-10",
-          "at_bats": 3,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-11",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-12",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-13",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-14",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-15",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 3,
-          "hits": 1
-        }
-      ]
+      "recent_form": {
+        "games_played": 10,
+        "at_bats": 37,
+        "hits": 6
+      }
     },
     {
       "batter": {
@@ -308,58 +120,11 @@
       },
       "is_home": true,
       "park_factor": 1.11,
-      "recent_logs": [
-        {
-          "date": "2026-08-09",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-10",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-11",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-12",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-13",
-          "at_bats": 5,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-14",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-15",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 4,
-          "hits": 2
-        }
-      ]
+      "recent_form": {
+        "games_played": 10,
+        "at_bats": 40,
+        "hits": 15
+      }
     },
     {
       "batter": {
@@ -380,58 +145,11 @@
       },
       "is_home": false,
       "park_factor": 0.9,
-      "recent_logs": [
-        {
-          "date": "2026-08-09",
-          "at_bats": 3,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-10",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-11",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-12",
-          "at_bats": 3,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-13",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-14",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-15",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 3,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 4,
-          "hits": 1
-        }
-      ]
+      "recent_form": {
+        "games_played": 10,
+        "at_bats": 36,
+        "hits": 4
+      }
     },
     {
       "batter": {
@@ -452,58 +170,11 @@
       },
       "is_home": false,
       "park_factor": 0.9,
-      "recent_logs": [
-        {
-          "date": "2026-08-09",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-10",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-11",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-12",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-13",
-          "at_bats": 4,
-          "hits": 0
-        },
-        {
-          "date": "2026-08-14",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-15",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 4,
-          "hits": 2
-        }
-      ]
+      "recent_form": {
+        "games_played": 10,
+        "at_bats": 38,
+        "hits": 11
+      }
     },
     {
       "batter": {
@@ -524,28 +195,11 @@
       },
       "is_home": true,
       "park_factor": 1.0,
-      "recent_logs": [
-        {
-          "date": "2026-08-15",
-          "at_bats": 4,
-          "hits": 2
-        },
-        {
-          "date": "2026-08-16",
-          "at_bats": 4,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-17",
-          "at_bats": 3,
-          "hits": 1
-        },
-        {
-          "date": "2026-08-18",
-          "at_bats": 4,
-          "hits": 1
-        }
-      ]
+      "recent_form": {
+        "games_played": 4,
+        "at_bats": 15,
+        "hits": 5
+      }
     }
   ]
 }
