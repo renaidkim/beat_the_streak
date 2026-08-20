@@ -12,6 +12,12 @@ class Pitcher:
     throws: str  # "L" or "R"
     era: float
     oba_against: float  # opponent batting average against, all batters
+    # Career rates entering this season (prior seasons only, no lookahead
+    # -- see beat_the_streak.data._career_pitching_rates_entering_season).
+    # Defaults are rough league averages, used only when a caller doesn't
+    # have real career data (e.g. hand-built test fixtures).
+    era_career: float = 4.30
+    k9_career: float = 8.5
     # False for a same-team placeholder used when a game's starter hasn't
     # been announced yet (common a few days out) -- see MlbStatsApiSource.
     confirmed: bool = True
@@ -24,12 +30,18 @@ class Batter:
     bats: str  # "L", "R", or "S" (switch)
     team: str
     career_avg: float  # career batting average entering this season (no in-season data)
-    # In-season average vs. each pitcher hand. Not model features on their
-    # own -- see rank.py -- used only as the reference point for platoon
-    # delta (today's-hand average minus in-season overall average).
+    # In-season average vs. each pitcher hand. Not a model feature on its
+    # own -- kept only for backward-compatible fixtures/display; the
+    # shipped model no longer uses platoon split (see rank.py docstring).
     season_avg: float
     season_avg_vs_lhp: float
     season_avg_vs_rhp: float
+    # Career on-base/strikeout/walk rate and age, all entering this season
+    # (no lookahead). Defaults are rough league averages.
+    career_obp: float = 0.320
+    career_k_rate: float = 0.22
+    career_bb_rate: float = 0.08
+    age: float = 27.0
 
 
 @dataclass(frozen=True)

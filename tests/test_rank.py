@@ -16,6 +16,12 @@ def test_higher_career_avg_scores_higher():
     assert score_matchup(strong).hit_probability > score_matchup(weak).hit_probability
 
 
+def test_higher_career_obp_scores_higher():
+    strong = make_matchup(batter=make_batter(career_obp=0.380))
+    weak = make_matchup(batter=make_batter(career_obp=0.280))
+    assert score_matchup(strong).hit_probability > score_matchup(weak).hit_probability
+
+
 def test_tougher_pitcher_lowers_probability():
     vs_tough = make_matchup(pitcher=make_pitcher(oba_against=0.200))
     vs_weak = make_matchup(pitcher=make_pitcher(oba_against=0.310))
@@ -25,38 +31,23 @@ def test_tougher_pitcher_lowers_probability():
     )
 
 
+def test_higher_strikeout_pitcher_lowers_probability():
+    # pitcher_k9_career was the single strongest non-batting-order feature
+    # by permutation importance on the 2026 holdout (see
+    # scripts/train_ml_model.py / README's "Model backtest" section).
+    vs_high_k = make_matchup(pitcher=make_pitcher(k9_career=11.5))
+    vs_low_k = make_matchup(pitcher=make_pitcher(k9_career=6.0))
+    assert (
+        score_matchup(vs_high_k).hit_probability
+        < score_matchup(vs_low_k).hit_probability
+    )
+
+
 def test_hitter_friendly_park_raises_probability():
     neutral = make_matchup(park_factor=1.0)
     hitter_park = make_matchup(park_factor=1.15)
     assert (
         score_matchup(hitter_park).hit_probability
-        > score_matchup(neutral).hit_probability
-    )
-
-
-def test_favorable_platoon_split_raises_probability():
-    # Batter hits well above his season average against this pitcher's
-    # throwing hand specifically. platoon_delta is only weakly/
-    # conditionally stable in the fitted model (see the bootstrap note in
-    # scripts/fit_hit_probability_model.py -- it's the one feature that
-    # isn't sign-stable across resamples), so unlike the other feature
-    # tests here this needs a context away from the model's "everything
-    # at a bland default" flat region to actually show movement -- the
-    # away/leadoff-spot context below is empirically confirmed responsive.
-    pitcher = make_pitcher(throws="L", oba_against=0.24)
-    context = dict(is_home=False, batting_order=1, park_factor=1.0)
-    favorable = make_matchup(
-        batter=make_batter(career_avg=0.28, season_avg=0.250, season_avg_vs_lhp=0.350, season_avg_vs_rhp=0.250),
-        pitcher=pitcher,
-        **context,
-    )
-    neutral = make_matchup(
-        batter=make_batter(career_avg=0.28, season_avg=0.250, season_avg_vs_lhp=0.250, season_avg_vs_rhp=0.250),
-        pitcher=pitcher,
-        **context,
-    )
-    assert (
-        score_matchup(favorable).hit_probability
         > score_matchup(neutral).hit_probability
     )
 

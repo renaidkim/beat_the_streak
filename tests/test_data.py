@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from beat_the_streak.data import MlbStatsApiSource, _career_avg_entering_season, _placeholder_pitcher
+from beat_the_streak.data import (
+    MlbStatsApiSource,
+    _career_hitting_rates_entering_season,
+    _career_pitching_rates_entering_season,
+    _placeholder_pitcher,
+)
 from beat_the_streak.features import LEAGUE_AVG_AVG
 
 
@@ -11,24 +16,36 @@ def test_placeholder_pitcher_is_unconfirmed_and_league_average():
     assert pitcher.id == "tbd:12345:away"
 
 
-def test_career_avg_excludes_current_season():
+def test_career_hitting_rates_excludes_current_season():
     person = {
         "stats": [
             {
                 "type": {"displayName": "yearByYear"},
                 "splits": [
-                    {"season": "2023", "stat": {"atBats": 400, "hits": 100}},
-                    {"season": "2024", "stat": {"atBats": 500, "hits": 150}},
-                    {"season": "2025", "stat": {"atBats": 300, "hits": 120}},  # current season, excluded
+                    {
+                        "season": "2023",
+                        "stat": {"atBats": 400, "hits": 100, "baseOnBalls": 40, "plateAppearances": 450, "strikeOuts": 80},
+                    },
+                    {
+                        "season": "2024",
+                        "stat": {"atBats": 500, "hits": 150, "baseOnBalls": 60, "plateAppearances": 570, "strikeOuts": 100},
+                    },
+                    {  # current season, excluded
+                        "season": "2025",
+                        "stat": {"atBats": 300, "hits": 120, "baseOnBalls": 30, "plateAppearances": 340, "strikeOuts": 50},
+                    },
                 ],
             }
         ]
     }
+    rates = _career_hitting_rates_entering_season(person, 2025)
     # (100 + 150) / (400 + 500), not including the 2025 row
-    assert _career_avg_entering_season(person, 2025) == (100 + 150) / (400 + 500)
+    assert rates["avg"] == (100 + 150) / (400 + 500)
+    assert rates["k_rate"] == (80 + 100) / (450 + 570)
+    assert rates["bb_rate"] == (40 + 60) / (450 + 570)
 
 
-def test_career_avg_none_when_no_prior_seasons():
+def test_career_hitting_rates_none_when_no_prior_seasons():
     person = {
         "stats": [
             {
@@ -37,7 +54,36 @@ def test_career_avg_none_when_no_prior_seasons():
             }
         ]
     }
-    assert _career_avg_entering_season(person, 2025) is None
+    assert _career_hitting_rates_entering_season(person, 2025) is None
+
+
+def test_career_pitching_rates_excludes_current_season():
+    person = {
+        "stats": [
+            {
+                "type": {"displayName": "yearByYear"},
+                "splits": [
+                    {"season": "2023", "stat": {"outs": 540, "earnedRuns": 70, "strikeOuts": 160}},
+                    {"season": "2025", "stat": {"outs": 300, "earnedRuns": 40, "strikeOuts": 90}},  # current, excluded
+                ],
+            }
+        ]
+    }
+    rates = _career_pitching_rates_entering_season(person, 2025)
+    assert rates["era"] == 70 * 27 / 540
+    assert rates["k9"] == 160 * 27 / 540
+
+
+def test_career_pitching_rates_none_when_no_prior_seasons():
+    person = {
+        "stats": [
+            {
+                "type": {"displayName": "yearByYear"},
+                "splits": [{"season": "2025", "stat": {"outs": 100, "earnedRuns": 10, "strikeOuts": 30}}],
+            }
+        ]
+    }
+    assert _career_pitching_rates_entering_season(person, 2025) is None
 
 
 def test_starting_batters_uses_boxscore_batting_order_as_slot():

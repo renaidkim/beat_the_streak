@@ -28,7 +28,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from .features import LEAGUE_AVG_AVG
+from .features import LEAGUE_AVG_AVG, LEAGUE_AVG_OBP, LEAGUE_AVG_PITCHER_K9
 from .models import Batter, Matchup, Pitcher
 
 MLB_STATS_API_BASE = "https://statsapi.mlb.com/api/v1"
@@ -45,6 +45,12 @@ EASTERN = ZoneInfo("America/New_York")
 # below -- oba_against there comes from LEAGUE_AVG_AVG instead, since
 # that's what actually feeds the model.
 LEAGUE_AVG_ERA = 4.30
+
+# Fallbacks for a batter with no prior-season yearByYear data (a true
+# rookie) -- rare, only hit when career_k_rate/career_bb_rate can't be
+# computed from real counting stats.
+LEAGUE_AVG_K_RATE = 0.22
+LEAGUE_AVG_BB_RATE = 0.08
 
 # How many ids to pack into one batched /people request. The API accepted
 # 80 comma-separated ids without complaint in testing; 50 leaves headroom.
@@ -111,8 +117,8 @@ class MlbStatsApiSource(DataSource):
                     }
                 )
 
-        batters = self._get_batters(batter_ids, season_year)
-        pitchers = self._get_pitchers(pitcher_ids)
+        batters = self._get_batters(batter_ids, season_year, date)
+        pitchers = self._get_pitchers(pitcher_ids, season_year)
 
         matchups: list[Matchup] = []
         for gm in game_matchups:
@@ -187,7 +193,10 @@ class MlbStatsApiSource(DataSource):
         self._roster_cache[team_id] = batters
         return batters
 
-    def _get_batters(self, batter_ids: set[int], season_year: int) -> dict[int, Batter]:
+    def _get_batters(
+        self, batter_ids: set[int], season_year: int, as_of_date: str
+    ) -> dict[int, Batter]:
+        as_of = datetime.date.fromisoformat(as_of_date)
         result: dict[int, Batter] = {}
         for chunk in _chunks(sorted(batter_ids), PEOPLE_BATCH_SIZE):
             resp = self._session.get(
@@ -207,42 +216,60 @@ class MlbStatsApiSource(DataSource):
                 season_stat = _stat_split(person, "season")
                 platoon_splits = _platoon_splits(person)
                 season_avg = float(season_stat.get("avg") or ".250")
-                career_avg = _career_avg_entering_season(person, season_year)
+                career = _career_hitting_rates_entering_season(person, season_year)
+                birth_date = person.get("birthDate")
+                age = (
+                    (as_of - datetime.date.fromisoformat(birth_date)).days / 365.25
+                    if birth_date
+                    else 27.0
+                )
                 result[person["id"]] = Batter(
                     id=str(person["id"]),
                     name=person["fullName"],
                     bats=person.get("batSide", {}).get("code", "R"),
                     team=person.get("currentTeam", {}).get("name", ""),
-                    career_avg=career_avg if career_avg is not None else season_avg,
+                    career_avg=career["avg"] if career else season_avg,
                     season_avg=season_avg,
                     # Falls back to season average when a split has too few
                     # at-bats to report an avg (early season, part-time
                     # platoon batter facing an unfamiliar hand, etc.).
                     season_avg_vs_lhp=float(platoon_splits.get("vl", {}).get("avg") or season_avg),
                     season_avg_vs_rhp=float(platoon_splits.get("vr", {}).get("avg") or season_avg),
+                    career_obp=career["obp"] if career else float(season_stat.get("obp") or LEAGUE_AVG_OBP),
+                    career_k_rate=career["k_rate"] if career else LEAGUE_AVG_K_RATE,
+                    career_bb_rate=career["bb_rate"] if career else LEAGUE_AVG_BB_RATE,
+                    age=age,
                 )
         return result
 
-    def _get_pitchers(self, pitcher_ids: set[int]) -> dict[int, Pitcher]:
+    def _get_pitchers(self, pitcher_ids: set[int], season_year: int) -> dict[int, Pitcher]:
         result: dict[int, Pitcher] = {}
         for chunk in _chunks(sorted(pitcher_ids), PEOPLE_BATCH_SIZE):
             resp = self._session.get(
                 f"{MLB_STATS_API_BASE}/people",
                 params={
                     "personIds": ",".join(str(i) for i in chunk),
-                    "hydrate": "stats(group=[pitching],type=[season])",
+                    "hydrate": "stats(group=[pitching],type=[season,yearByYear])",
                 },
                 timeout=20,
             )
             resp.raise_for_status()
             for person in resp.json().get("people", []):
                 stat = _stat_split(person, "season")
+                season_era = float(stat.get("era") or 4.50)
+                career = _career_pitching_rates_entering_season(person, season_year)
                 result[person["id"]] = Pitcher(
                     id=str(person["id"]),
                     name=person["fullName"],
                     throws=person.get("pitchHand", {}).get("code", "R"),
-                    era=float(stat.get("era") or 4.50),
+                    era=season_era,
                     oba_against=float(stat.get("avg") or ".250"),
+                    era_career=career["era"] if career else season_era,
+                    k9_career=(
+                        career["k9"]
+                        if career
+                        else float(stat.get("strikeoutsPer9Inn") or LEAGUE_AVG_PITCHER_K9)
+                    ),
                 )
         return result
 
@@ -289,31 +316,77 @@ def _platoon_splits(person: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return result
 
 
-def _career_avg_entering_season(person: dict[str, Any], season_year: int) -> float | None:
-    """Sum of hits/at-bats across every season strictly before season_year,
-    from the person's yearByYear stat group. None if there isn't one
-    (a rookie with no prior-season at-bats) -- callers fall back to
-    in-season average in that case.
+def _career_hitting_rates_entering_season(
+    person: dict[str, Any], season_year: int
+) -> dict[str, float] | None:
+    """Career avg/obp/k_rate/bb_rate summed from counting stats across
+    every season strictly before season_year, from the person's
+    yearByYear stat group. Rates are recomputed from summed counts, not
+    averaged from each season's own rate, so a 230-PA rookie season
+    doesn't get weighted the same as a 650-PA everyday one. None if
+    there's no prior-season data (a rookie) -- callers fall back to
+    season-level figures in that case.
     """
-    ab = hits = 0
+    ab = hits = bb = hbp = sf = so = pa = 0
     for stat_group in person.get("stats", []):
         if stat_group.get("type", {}).get("displayName") != "yearByYear":
             continue
         for split in stat_group.get("splits", []):
             season = int(split.get("season", season_year))
-            if season < season_year:
-                ab += int(split["stat"].get("atBats", 0))
-                hits += int(split["stat"].get("hits", 0))
-    return hits / ab if ab > 0 else None
+            if season >= season_year:
+                continue
+            st = split["stat"]
+            ab += int(st.get("atBats", 0))
+            hits += int(st.get("hits", 0))
+            bb += int(st.get("baseOnBalls", 0))
+            hbp += int(st.get("hitByPitch", 0))
+            sf += int(st.get("sacFlies", 0))
+            so += int(st.get("strikeOuts", 0))
+            pa += int(st.get("plateAppearances", 0))
+    if ab == 0:
+        return None
+    obp_den = ab + bb + hbp + sf
+    avg = hits / ab
+    return {
+        "avg": avg,
+        "obp": (hits + bb + hbp) / obp_den if obp_den > 0 else avg,
+        "k_rate": so / pa if pa > 0 else LEAGUE_AVG_K_RATE,
+        "bb_rate": bb / pa if pa > 0 else LEAGUE_AVG_BB_RATE,
+    }
+
+
+def _career_pitching_rates_entering_season(
+    person: dict[str, Any], season_year: int
+) -> dict[str, float] | None:
+    """Career ERA and K/9 summed from counting stats across every season
+    strictly before season_year, from the person's yearByYear stat group.
+    None if there's no prior MLB season (a rookie) -- callers fall back
+    to this season's own rates in that case.
+    """
+    outs = er = k = 0
+    for stat_group in person.get("stats", []):
+        if stat_group.get("type", {}).get("displayName") != "yearByYear":
+            continue
+        for split in stat_group.get("splits", []):
+            season = int(split.get("season", season_year))
+            if season >= season_year:
+                continue
+            st = split["stat"]
+            outs += int(st.get("outs", 0))
+            er += int(st.get("earnedRuns", 0))
+            k += int(st.get("strikeOuts", 0))
+    if outs == 0:
+        return None
+    return {"era": er * 27 / outs, "k9": k * 27 / outs}
 
 
 def _placeholder_pitcher(tbd_id: str) -> Pitcher:
     """Stand-in for a game whose starter hasn't been announced yet.
 
-    Neutral by construction: league-average oba_against (the only figure
-    that actually feeds the model), a made-up but plausible ERA, and
-    confirmed=False so rank.py can call this out in its explanation
-    rather than silently presenting it as real information.
+    Neutral by construction: league-average figures for every stat that
+    actually feeds the model, and confirmed=False so rank.py can call
+    this out in its explanation rather than silently presenting it as
+    real information.
     """
     return Pitcher(
         id=tbd_id,
@@ -321,6 +394,8 @@ def _placeholder_pitcher(tbd_id: str) -> Pitcher:
         throws="R",
         era=LEAGUE_AVG_ERA,
         oba_against=LEAGUE_AVG_AVG,
+        era_career=LEAGUE_AVG_ERA,
+        k9_career=LEAGUE_AVG_PITCHER_K9,
         confirmed=False,
     )
 

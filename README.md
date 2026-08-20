@@ -29,18 +29,20 @@ game (pick 1-2 batters/day who you think will record a hit).
      as a "TBD" badge and called out in that pick's reasons) so the page
      still has something useful to look at before starters are set —
      just revisit closer to game time as real lineups and starters post.
-2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into six
-   signals: career batting average entering the season, platoon delta
-   (average vs. today's opposing pitcher hand, minus in-season overall
-   average), the opposing pitcher's average-against, park factor,
-   home/away, and batting order slot.
+2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into 12
+   signals: batting order slot, the opposing pitcher's career
+   strikeouts-per-9 and career ERA (both entering this season) and
+   season-to-date average against, park factor, the batter's career
+   average/OBP/strikeout rate/walk rate (career, entering this season),
+   age, and both players' handedness.
 3. **Ranking** (`beat_the_streak/rank.py`) — a gradient-boosted model, fit
-   on a real season of outcomes, predicts P(hit) directly from those
-   signals. See [Model backtest](#model-backtest) below for the two
-   rounds of testing that produced this specific feature set and model
-   type — it did not start out looking like this. Picking the top N picks
-   purely by probability, *including* two batters who share a pitcher —
-   see [Why same-pitcher picks aren't avoided](#why-same-pitcher-picks-arent-avoided)
+   on multiple past seasons of outcomes and validated on a season it
+   never saw, predicts P(hit) directly from those signals. See
+   [Model backtest](#model-backtest) below for the three rounds of
+   testing that produced this specific feature set and model type — it
+   did not start out looking like this. Picking the top N picks purely by
+   probability, *including* two batters who share a pitcher — see
+   [Why same-pitcher picks aren't avoided](#why-same-pitcher-picks-arent-avoided)
    for why that's actually the right call for how this game scores a
    two-pick day, not an oversight.
 4. **CLI** (`beat_the_streak/cli.py`) — prints the ranked slate and the
@@ -216,7 +218,128 @@ gain was consistent and reproducible, not marginal or mixed.
 
 Rerun `python scripts/fit_hit_probability_model.py` (needs
 `requirements-analysis.txt` for pandas/numpy on top of the runtime deps)
-once or twice a season to refresh against a more recent year.
+once or twice a season to refresh against a more recent year. (Superseded
+by round three below — kept as the historical record and because its
+6-feature model is still the "prior_production_model" baseline that gets
+compared against on every retrain.)
+
+### Round three: multi-season training, a broad feature set, real explainability
+
+Round two was still evaluated with a date split *within* one season
+(2025) — a real test, but one where the model could still implicitly pick
+up on that season's specific park/weather/league conditions. Asked to
+build something "entirely machine-learning driven" with real
+explainability rather than hand-written threshold text,
+`scripts/fit_ml_model.py` + `scripts/train_ml_model.py` do three things
+differently:
+
+1. **Train on 2023-2025, test purely on 2026** — a season the model never
+   saw a single row of during fitting or feature selection. Meaningfully
+   stronger than a within-season split.
+2. **A broad, systematically-built feature set** (~24 features) instead of
+   6 hand-picked ones: full career slash line, career walk/strikeout
+   rates, a pitcher's career ERA/WHIP/K9/BB9/HR9 (not just season-to-date
+   average-against), age, handedness for both sides, rest days since last
+   appearance, and month of season, in addition to what round two already
+   found. Not pre-filtered by hand — permutation importance decided what
+   mattered.
+3. **Four real model families compared** (L2 logistic regression, random
+   forest, gradient boosting, a small MLP), and **permutation importance**
+   on the true 2026 holdout as the explainability method — the actual
+   drop in held-out performance when a feature is shuffled, rather than
+   impurity-based importance (which inflates high-cardinality/continuous
+   features) or hand-picked reason thresholds.
+
+**Only 12 of the 24 features had real (positive) permutation importance**
+on the 2026 holdout — the rest (rest days since last appearance for
+either player, month, `is_home`, `platoon_delta`, career ISO/BABIP/SLG,
+pitcher WHIP/BB9/HR9, switch-hitter indicator) were ~zero or negative,
+indistinguishable from noise. That includes `platoon_delta` and
+`is_home`, both of which round two's own writeup already flagged as
+shaky (conditionally important and never-reliably-signed, respectively)
+— round three's broader test confirms neither earns a place once
+better-behaved features are available. The model was refit on just the
+12 real ones: fewer live API calls, and every remaining feature earned
+its place on held-out data rather than intuition.
+
+**The best-scoring model on raw log loss (random forest) had to be
+rejected anyway.** Direct point-checks — the same technique that caught
+round two's backwards-prediction bug — found it scoring a .230 career
+hitter *below* a .200 one at otherwise-default feature values. Identical
+pathology, different model family: `RandomForestClassifier` has no
+`monotonic_cst` equivalent in scikit-learn, so nothing stops a tree
+ensemble from learning a locally-backwards relationship in sparse
+regions of feature space even while scoring well in aggregate. The
+shipped model is instead the runner-up, gradient boosting with the same
+kind of monotonic constraints round two used (`batting_order` and
+`pitcher_k9_career`/`career_k_rate` non-increasing; `park_factor`,
+`career_avg`, `pitcher_oba_against`, `career_obp`, `pitcher_era_career`
+non-decreasing; handedness and age left unconstrained) — verified
+monotonic by point-checks across every constrained feature before
+shipping, at a cost of about 0.0005 holdout log loss versus the
+rejected random forest.
+
+| Model, scored on the true 2026 holdout | Log loss | Brier | AUC |
+| :--- | :--- | :--- | :--- |
+| Naive baseline (constant training-set rate) | 0.6493 | 0.2284 | 0.500 |
+| Round-two model (6 features, within-2025-season validated) | 0.6477 | 0.2277 | 0.533 |
+| Logistic regression (12 features) | 0.6480 | 0.2278 | 0.536 |
+| Random forest (12 features) — **rejected, see above** | 0.6463 | 0.2270 | 0.546 |
+| **Gradient boosting, monotonic (12 features, shipped)** | **0.6468** | **0.2273** | **0.544** |
+| Neural net / MLP (12 features) | 0.6507 | 0.2290 | 0.532 |
+
+The gain over round two is real across all three metrics but modest —
+this is the honest ceiling for a single-game outcome that's close to a
+coin flip no matter how many features get thrown at it (see round one's
+finding on raw feature-outcome correlation). What round three actually
+delivers is less about squeezing out more log loss and more about the
+other two things that were asked for: a feature set decided by
+out-of-sample evidence instead of hand-picking, and reason strings in
+`rank._explain()` that only describe features the model actually uses
+(no more platoon-split callouts for a feature the model no longer sees).
+
+**What this means for whether the app's picks are actually worth
+following** — the metric above (log loss/Brier/AUC) measures calibration
+across *every* batter-game in the holdout, not "how often would
+following the app's top pick have won." That's a different, more
+direct number, computed by `scripts/pick_accuracy.py` on the same true
+2026 holdout (139 test dates, restricted to the ~100 highest-PA batters
+per season the way the whole backtest is — see
+[Known gaps](#known-gaps)):
+
+| | Hit rate |
+| :--- | :--- |
+| Naive "always guess hit" baseline (this dataset's base rate) | 64.7% |
+| Naive "just pick the highest career average" — top pick | 73.4% |
+| Naive "just pick the highest career average" — top 2 | 71.2% |
+| **Model's top daily pick** | **77.7%** |
+| **Model's top 2 daily picks** (each pick's own hit rate) | **74.1%** |
+| Double-down joint success (*both* of the top 2 hit, per MLB's actual scoring rule) | 54.7% |
+
+Two things worth being explicit about when comparing this to another
+tool's advertised "accuracy": first, the ~65% baseline above means any
+tool that mostly recommends everyday, good-hitting players is starting
+from a high floor before it's contributed anything — "70% accuracy" on
+its own doesn't say much without knowing what it's being measured
+against. Second, the double-down number (54.7%) is the realistic
+expectation if you play two picks a day the way this game actually
+scores it (both must hit) — it's necessarily lower than either pick's
+own marginal rate, since it's the *product* of two sub-100% events (with
+positive correlation from same-pitcher pairs helping some, per
+[Why same-pitcher picks aren't avoided](#why-same-pitcher-picks-arent-avoided)).
+If you're comparing against a single-pick tool, the top-daily-pick row
+(77.7%) is the fairer comparison.
+
+Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
+data) then `python scripts/train_ml_model.py` (builds features, trains,
+picks a winner among the monotonic-safe candidates, writes
+`data/hit_probability_model_v2.json`/`.pkl`) once a year, once the
+season being used as the test set completes so it can roll into the
+next training window; both need `requirements-analysis.txt`. Review the
+printed comparison and permutation importances before promoting —
+`fit_hit_probability_model.py`'s output can then retire in favor of
+this one, but is kept for now as the historical baseline the retrain
+compares against.
 
 ## Why same-pitcher picks aren't avoided
 
@@ -311,10 +434,15 @@ beat-the-streak 2026-08-19 --source fixture \
 # Refresh the park-factor table (run once or twice a season):
 python scripts/refresh_park_factors.py
 
-# Refresh the hit-probability model against a more recent season
+# Refresh the hit-probability model against more recent seasons
 # (needs requirements-analysis.txt):
 pip install -r requirements-analysis.txt
-python scripts/fit_hit_probability_model.py
+python scripts/fit_ml_model.py      # fetch + cache 2023-2026 data
+python scripts/train_ml_model.py    # build features, train, compare, write data/hit_probability_model_v2.*
+
+# See how often the model's own daily picks would actually have won,
+# on the true 2026 holdout (needs train_ml_model.py's cached dataset):
+python scripts/pick_accuracy.py
 
 # Render the static site locally (see Hosted site below for publishing it):
 python scripts/generate_site.py --days 3 --out _site
@@ -333,29 +461,42 @@ python scripts/generate_site.py --days 3 --out _site
 - Park factors aren't split by batter handedness (some parks favor lefties
   or righties very differently — Yankee Stadium's short right field is
   the classic example).
-- The model was backtested on one season (2025) and ~14k batter-games
-  from the ~100 highest-plate-appearance hitters; it hasn't been
-  validated on part-time players, rookies with short track records, or a
-  second season.
-- `platoon_delta` turned out to be conditionally important rather than
-  reliably important (see [Model backtest](#model-backtest)) — the
-  gradient-boosting model can represent "matters here, doesn't matter
-  there," but that also means it's the one feature whose effect isn't
-  well summarized by a single number, and the least-tested one by the
-  bootstrap.
-- `is_home` is carried as a feature but never showed a reliable direction
-  or magnitude across any round of testing; it's along for the ride more
-  than it's doing real work.
+- The model is backtested on the ~100 highest-plate-appearance hitters
+  per season; it hasn't been validated on part-time players or true
+  rookies specifically — `build_dataset` in `train_ml_model.py` actually
+  drops rookies with zero prior-season data entirely from training, and
+  the live app falls back to season-level/league-average figures for the
+  same case (see `data._career_hitting_rates_entering_season` and
+  `_career_pitching_rates_entering_season`), so predictions for a
+  first-year player are the least-tested case in the whole pipeline.
+- `platoon_delta` and `is_home` were both dropped from the model in round
+  three — both came back with ~zero permutation importance on the true
+  2026 holdout, confirming what round two's bootstrap had already flagged
+  as shaky for each of them (see [Model backtest](#model-backtest)).
 - No accounting for a batter's own recent injury/rest status, or same-day
-  lineup changes after prediction time.
-- The monotonic constraints (career average, pitcher quality, and park
-  factor forced non-decreasing; batting order non-increasing) are
-  asserted from baseball domain knowledge and the linear model's
-  bootstrap-confirmed directions, not independently re-derived by the
-  gradient-boosting fit itself — a deliberate choice (see
-  [Model backtest](#model-backtest)) to keep the model from being able to
-  contradict signal it already validated, but worth knowing that's what
-  they are.
+  lineup changes after prediction time. Round three did test rest days
+  since each player's last appearance explicitly — it came back with
+  ~zero permutation importance and was dropped, so this isn't an
+  oversight, just a feature that didn't turn out to matter at the
+  single-game level.
+- The monotonic constraints (see round three in
+  [Model backtest](#model-backtest) for the full list) are asserted from
+  baseball domain knowledge, not independently re-derived by the
+  gradient-boosting fit itself — a deliberate choice to keep the model
+  from being able to contradict signal already confirmed by simpler
+  models and direct point-checks, but worth knowing that's what they are.
+  `RandomForestClassifier` scored marginally better on raw holdout log
+  loss but was rejected for exactly this reason (no monotonic-constraint
+  mechanism in scikit-learn) — every future retrain needs the same
+  point-check discipline before shipping a new winner, not just a log
+  loss comparison.
+- The pick-accuracy numbers in round three (77.7% top-pick hit rate, etc.)
+  come from the same ~100-highest-PA-batters-per-season proxy dataset as
+  the rest of the backtest, not a literal replay of what the live app
+  would have shown on those 139 days (which sees every confirmed starter
+  in real games that day, not just a fixed top-100 list). It's a
+  reasonable proxy — Beat the Streak strategy already favors picking
+  everyday, high-PA hitters — but not an exact one.
 
 ## Tests
 

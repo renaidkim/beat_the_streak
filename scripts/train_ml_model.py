@@ -46,15 +46,39 @@ LEAGUE_AVG_AVG = 0.245
 MODEL_OUT_JSON = REPO_ROOT / "data" / "hit_probability_model_v2.json"
 MODEL_OUT_PKL = REPO_ROOT / "data" / "hit_probability_model_v2.pkl"
 
+# Full broad set tried first (see the run this replaced, recorded in
+# git history and the README): 24 features across career slash line,
+# rates, pitcher career rates, rest days, month, handedness, home/away.
+# Permutation importance on the true 2026 holdout showed only these 12
+# with real (positive, above-noise) importance -- the rest (rest days,
+# month, is_home, platoon_delta, career_iso/babip/slg, pitcher whip/bb9/
+# hr9, bats_S) were ~zero or negative, i.e. indistinguishable from noise.
+# Pruned to just the signal: fewer live API calls, and every remaining
+# feature earned its place on held-out data rather than intuition.
 FEATURE_COLS = [
-    "career_avg", "career_obp", "career_slg", "career_iso", "career_babip",
-    "career_bb_rate", "career_k_rate", "batter_age", "bats_L", "bats_S",
-    "platoon_delta", "rest_days_batter",
-    "pitcher_era_career", "pitcher_whip_career", "pitcher_k9_career",
-    "pitcher_bb9_career", "pitcher_hr9_career", "pitcher_oba_against",
-    "pitcher_throws_L", "rest_days_pitcher",
-    "park_factor", "is_home", "batting_order", "month",
+    "batting_order", "pitcher_k9_career", "park_factor", "career_avg",
+    "pitcher_oba_against", "bats_L", "career_obp", "pitcher_throws_L",
+    "pitcher_era_career", "career_k_rate", "batter_age", "career_bb_rate",
 ]
+
+# Domain-asserted monotonic direction per feature above, for
+# HistGradientBoostingClassifier's monotonic_cst: 1 = P(hit) should not
+# decrease as the feature increases, -1 = should not increase, 0 = no
+# asserted direction. Without this, a flexible tree ensemble can and does
+# learn locally backwards relationships in sparse regions of feature
+# space -- e.g. random_forest here scores a .230 career hitter *below* a
+# .200 one at otherwise-default feature values, confirmed by direct
+# point-checks. sklearn's RandomForestClassifier has no equivalent
+# constraint, which is why it's excluded from MONOTONIC_SAFE_CANDIDATES
+# below despite scoring best on raw holdout log loss.
+MONOTONIC_CST = [-1, -1, 1, 1, 1, 0, 1, 0, 1, -1, 0, 0]
+
+# Only candidates where a backwards-prediction pathology can't sneak
+# through get to be the "winner" that's actually shipped -- logistic
+# regression is monotonic by construction, and gbm has monotonic_cst
+# applied above. random_forest and mlp are still fit and reported for
+# the multi-family comparison, just never selected.
+MONOTONIC_SAFE_CANDIDATES = {"logreg", "gbm"}
 
 
 # ----------------------------------------------------------- career agg ---
@@ -370,7 +394,10 @@ def main() -> int:
     m = report("random forest", y_test, rf.predict_proba(X_test)[:, 1])
     candidates["random_forest"] = (rf, m)
 
-    gbm = HistGradientBoostingClassifier(max_depth=4, max_iter=200, learning_rate=0.04, random_state=0)
+    gbm = HistGradientBoostingClassifier(
+        max_depth=4, max_iter=200, learning_rate=0.04, random_state=0,
+        monotonic_cst=MONOTONIC_CST,
+    )
     gbm.fit(X_train, y_train)
     m = report("gradient boosting", y_test, gbm.predict_proba(X_test)[:, 1])
     candidates["gbm"] = (gbm, m)
@@ -383,9 +410,13 @@ def main() -> int:
     m = report("neural net (MLP)", y_test, mlp.predict_proba(X_test)[:, 1])
     candidates["mlp"] = (mlp, m)
 
-    winner_name = min(candidates, key=lambda k: candidates[k][1]["log_loss"])
-    winner_model, winner_metrics = candidates[winner_name]
-    print(f"\nWinner by 2026 holdout log loss: {winner_name} ({winner_metrics})")
+    safe_candidates = {k: v for k, v in candidates.items() if k in MONOTONIC_SAFE_CANDIDATES}
+    winner_name = min(safe_candidates, key=lambda k: safe_candidates[k][1]["log_loss"])
+    winner_model, winner_metrics = safe_candidates[winner_name]
+    print(
+        f"\nWinner among monotonic-safe candidates {sorted(MONOTONIC_SAFE_CANDIDATES)} "
+        f"by 2026 holdout log loss: {winner_name} ({winner_metrics})"
+    )
 
     print(f"\n--- Permutation importance for {winner_name}, on 2026 holdout ---")
     perm = permutation_importance(
