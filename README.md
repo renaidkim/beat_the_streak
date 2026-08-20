@@ -429,6 +429,20 @@ output. Makes sense in hindsight: `HistGradientBoostingClassifier`
 already directly optimizes log loss during training, so there isn't
 much miscalibration left to fix. Not implemented.
 
+**Opposing team defense, tested and not worth it:**
+`scripts/test_defense.py` tests team-level Outs Above Average (OAA,
+Baseball Savant's modern range-based defensive metric) for the
+opposing team, prior-completed-season lag (OAA has no point-in-time
+reconstruction available the way bullpen ERA did -- it needs play-by-
+play difficulty-adjusted tracking data, not just box-score putouts/
+errors). Given what the bullpen test's reversal just showed about
+prior-season proxies looking better than they are, this was held to a
+higher bar going in. It didn't clear even the lower bar: log loss
+0.6468 -> 0.6468 (no change), bootstrap 95% CI [-0.00042, +0.00036]
+comfortably spanning zero, 57% of draws favoring it -- a coin flip, not
+the lopsided 91% the bullpen proxy showed before it reversed. Not
+implemented.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes
