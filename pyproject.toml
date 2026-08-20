@@ -1,0 +1,19 @@
+[project]
+name = "beat-the-streak"
+version = "0.1.0"
+description = "Daily hit-probability rankings for MLB.com's Beat the Streak"
+requires-python = ">=3.11"
+dependencies = ["requests>=2.31"]
+
+[project.scripts]
+beat-the-streak = "beat_the_streak.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
