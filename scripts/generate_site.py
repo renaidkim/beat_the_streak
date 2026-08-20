@@ -22,20 +22,35 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from beat_the_streak.data import MlbStatsApiSource  # noqa: E402
 from beat_the_streak.rank import Pick, pick_top, rank_matchups  # noqa: E402
 
+# Used to decide which calendar date is "today" -- MLB's own schedule is
+# organized by this same US Eastern "baseball day" boundary (see
+# beat_the_streak/data.py), not wherever this script happens to run or
+# wherever the reader is. Deliberately NOT swapped for the reader's local
+# time: a 7pm Pacific game is already "tomorrow" in Eastern terms some
+# nights, so using Pacific here would occasionally show the wrong day's
+# slate under "Today". Only the *displayed* generated-at timestamp below
+# uses Pacific, for readability -- that doesn't affect which games appear.
 EASTERN = ZoneInfo("America/New_York")
+PACIFIC = ZoneInfo("America/Los_Angeles")
+
+GITHUB_ACTIONS_URL = "https://github.com/renaidkim/beat_the_streak/actions/workflows/publish.yml"
 
 
 def render_page(days: int) -> str:
     source = MlbStatsApiSource()
     today = datetime.datetime.now(EASTERN).date()
-    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    generated_at = datetime.datetime.now(PACIFIC).strftime("%Y-%m-%d %I:%M %p %Z")
 
     day_sections = []
     for offset in range(days):
         date = today + datetime.timedelta(days=offset)
         day_sections.append(render_day(source, date, label=_day_label(offset)))
 
-    return _PAGE_TEMPLATE.format(generated_at=generated_at, day_sections="\n".join(day_sections))
+    return _PAGE_TEMPLATE.format(
+        generated_at=generated_at,
+        github_actions_url=GITHUB_ACTIONS_URL,
+        day_sections="\n".join(day_sections),
+    )
 
 
 def _day_label(offset: int) -> str:
@@ -146,8 +161,20 @@ _PAGE_TEMPLATE = """<!doctype html>
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     max-width: 720px; margin-left: auto; margin-right: auto;
   }}
+  .header {{
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;
+  }}
   h1 {{ font-size: 1.4rem; margin-bottom: 0.2rem; }}
-  .generated {{ color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }}
+  .generated {{ color: var(--muted); font-size: 0.85rem; }}
+  .refresh-btn {{
+    display: inline-flex; align-items: center; gap: 0.4rem; flex-shrink: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.5rem 0.9rem; color: var(--text); text-decoration: none; font-size: 0.85rem;
+    font-weight: 600;
+  }}
+  .refresh-btn:hover {{ border-color: var(--accent); }}
+  .refresh-hint {{ color: var(--muted); font-size: 0.78rem; margin-top: 0.3rem; max-width: 14rem; }}
   h2 {{ font-size: 1.15rem; margin-top: 2.5rem; margin-bottom: 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }}
   h2 .date {{ color: var(--muted); font-weight: normal; font-size: 0.85rem; }}
   .picks {{ display: flex; flex-direction: column; gap: 0.6rem; }}
@@ -173,8 +200,16 @@ _PAGE_TEMPLATE = """<!doctype html>
 </style>
 </head>
 <body>
-<h1>Beat the Streak Picks</h1>
-<p class="generated">Generated {generated_at}</p>
+<div class="header">
+  <div>
+    <h1>Beat the Streak Picks</h1>
+    <p class="generated">Generated {generated_at}</p>
+  </div>
+  <div>
+    <a class="refresh-btn" href="{github_actions_url}" target="_blank" rel="noopener">&#8635; Refresh predictions</a>
+    <p class="refresh-hint">Opens GitHub Actions -- click "Run workflow" to pull fresh lineups (~30s).</p>
+  </div>
+</div>
 {day_sections}
 </body>
 </html>

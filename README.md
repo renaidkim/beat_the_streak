@@ -224,12 +224,24 @@ picks as one static HTML page (`_site/index.html`) — no server, no
 client-side JS, just an f-string template. `.github/workflows/publish.yml`
 runs it and publishes the result to GitHub Pages:
 
-- **On demand**: open the repo's **Actions** tab → **Publish picks** →
-  **Run workflow** (also doable from the GitHub mobile app). Takes under
-  a minute. This is the main way to refresh after new lineups post.
+- **On demand**: the page itself has a **↻ Refresh predictions** button
+  in the top right, which links straight to the workflow's Actions page
+  (also reachable via the repo's **Actions** tab → **Publish picks**).
+  Click **Run workflow** there (needs you signed into GitHub; also
+  doable from the mobile app) and the page updates in under a minute.
+  This is the main way to refresh after new lineups post. A real
+  in-page button that triggers the run without leaving the page would
+  need a token embedded in the public page — not done, since anyone
+  viewing the page could then use it to burn your Actions minutes.
 - **On a schedule**, as a baseline so the page isn't stale if nobody
   triggers it by hand: every 2 hours, all day. Edit the `cron` line in
   the workflow file to change the cadence.
+- The "Generated at" timestamp on the page is Pacific time. The
+  Today/Tomorrow/day-after-tomorrow *date boundaries* stay on US
+  Eastern internally regardless of the viewer's timezone, though —
+  that's the actual convention MLB's own schedule uses (a 7pm Pacific
+  game is already "tomorrow" in Eastern terms some nights), so changing
+  it to Pacific would occasionally put a game under the wrong day.
 
 **One-time setup** (I can't do this part myself — it's a repo setting,
 not something available through the tools in this session): in the
