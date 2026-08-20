@@ -17,6 +17,7 @@ objects so nothing downstream needs to know which one was used.
 
 from __future__ import annotations
 
+import datetime
 import json
 from abc import ABC, abstractmethod
 from functools import lru_cache
@@ -25,10 +26,15 @@ from typing import Any
 
 import requests
 
-from .features import RECENT_FORM_WINDOW
+from .features import LEAGUE_AVG_AVG, RECENT_FORM_WINDOW
 from .models import Batter, Matchup, Pitcher, RecentForm
 
 MLB_STATS_API_BASE = "https://statsapi.mlb.com/api/v1"
+
+# Rough league-average ERA, used only for the TBD-starter placeholder
+# below -- oba_against there comes from LEAGUE_AVG_AVG instead, since
+# that's what actually feeds the model.
+LEAGUE_AVG_ERA = 4.30
 
 # How many ids to pack into one batched /people request. The API accepted
 # 80 comma-separated ids without complaint in testing; 50 leaves headroom.
@@ -63,18 +69,28 @@ class MlbStatsApiSource(DataSource):
         pitcher_ids: set[int] = set()
         batter_ids: set[int] = set()
 
+        # Confirmed lineups only ever exist for games happening today;
+        # skip the boxscore call entirely for future dates rather than
+        # firing a request that's guaranteed to come back empty.
+        is_today = date == datetime.date.today().isoformat()
+
         for game in games:
             park_factor = self._get_park_factor(game["teams"]["home"]["team"]["id"])
-            boxscore = self._get_boxscore(game["gamePk"])
+            boxscore = self._get_boxscore(game["gamePk"]) if is_today else {}
             for side, opponent_side in (("home", "away"), ("away", "home")):
                 team = game["teams"][side]["team"]
                 opp_pitcher_info = game["teams"][opponent_side].get("probablePitcher")
-                if not opp_pitcher_info:
-                    continue
-                pitcher_id = opp_pitcher_info["id"]
                 lineup = self._get_starting_batters(boxscore, side, team["id"])
-                pitcher_ids.add(pitcher_id)
                 batter_ids.update(lineup)
+                if opp_pitcher_info:
+                    pitcher_id: int | str = opp_pitcher_info["id"]
+                    pitcher_ids.add(pitcher_id)
+                else:
+                    # Starter not announced yet (routine a few days out --
+                    # see the schedule endpoint's typical lead time).
+                    # Score with a neutral placeholder instead of dropping
+                    # the whole team's batters for the day.
+                    pitcher_id = f"tbd:{game['gamePk']}:{opponent_side}"
                 game_matchups.append(
                     {
                         "pitcher_id": pitcher_id,
@@ -89,7 +105,11 @@ class MlbStatsApiSource(DataSource):
 
         matchups: list[Matchup] = []
         for gm in game_matchups:
-            pitcher = pitchers.get(gm["pitcher_id"])
+            pitcher_id = gm["pitcher_id"]
+            if isinstance(pitcher_id, str):
+                pitcher = _placeholder_pitcher(pitcher_id)
+            else:
+                pitcher = pitchers.get(pitcher_id)
             if pitcher is None:
                 continue
             for batter_id in gm["batter_ids"]:
@@ -260,6 +280,24 @@ def _platoon_splits(person: dict[str, Any]) -> dict[str, dict[str, Any]]:
             if code in ("vl", "vr"):
                 result[code] = split.get("stat", {})
     return result
+
+
+def _placeholder_pitcher(tbd_id: str) -> Pitcher:
+    """Stand-in for a game whose starter hasn't been announced yet.
+
+    Neutral by construction: league-average oba_against (the only figure
+    that actually feeds the model), a made-up but plausible ERA, and
+    confirmed=False so rank.py can call this out in its explanation
+    rather than silently presenting it as real information.
+    """
+    return Pitcher(
+        id=tbd_id,
+        name="TBD",
+        throws="R",
+        era=LEAGUE_AVG_ERA,
+        oba_against=LEAGUE_AVG_AVG,
+        confirmed=False,
+    )
 
 
 def _chunks(items: list[int], size: int) -> list[list[int]]:

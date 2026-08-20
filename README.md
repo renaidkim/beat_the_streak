@@ -18,6 +18,17 @@ game (pick 1-2 batters/day who you think will record a hit).
      [Performance](#performance) for how it keeps request volume down.
    - `FixtureSource` reads a static JSON file instead, for offline dev,
      tests, and demos (`data/sample_slate_2026-08-19.json`).
+   - Works up to a few days ahead, not just today. Confirmed lineups only
+     ever exist for today's games, so future days always use the roster
+     fallback; further out, a growing share of games don't have an
+     announced starting pitcher yet either (same-day: ~100% announced;
+     +1 day: ~25-30% typically; +2/+3 days: even less — MLB just doesn't
+     post them that far ahead most of the time). Rather than dropping
+     those batters, unannounced pitchers get a neutral, clearly-labeled
+     placeholder (league-average `oba_against`, `confirmed=False`, shown
+     as a "TBD" badge and called out in that pick's reasons) so the page
+     still has something useful to look at before starters are set —
+     just revisit closer to game time as real lineups and starters post.
 2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into a
    handful of signals: season average, last-10-games form, the platoon
    split (average specifically vs. today's opposing pitcher hand), the
@@ -132,6 +143,30 @@ Rerun `python scripts/fit_hit_probability_model.py` (needs
 only, not a runtime dependency) once or twice a season to refresh the
 coefficients against a more recent year.
 
+## Hosted site
+
+`scripts/generate_site.py` renders today/tomorrow/day-after-tomorrow's
+picks as one static HTML page (`_site/index.html`) — no server, no
+client-side JS, just an f-string template. `.github/workflows/publish.yml`
+runs it and publishes the result to GitHub Pages:
+
+- **On demand**: open the repo's **Actions** tab → **Publish picks** →
+  **Run workflow** (also doable from the GitHub mobile app). Takes under
+  a minute. This is the main way to refresh after new lineups post.
+- **On a schedule**, as a baseline so the page isn't stale if nobody
+  triggers it by hand: every 2 hours, all day. Edit the `cron` line in
+  the workflow file to change the cadence.
+
+**One-time setup** (I can't do this part myself — it's a repo setting,
+not something available through the tools in this session): in the
+repo's **Settings → Pages**, set **Source** to **GitHub Actions**. After
+that, the first workflow run publishes the page and prints its URL in
+the deploy job's summary.
+
+Cost: $0. GitHub Pages and Actions are free for a repo like this one
+(unlimited Actions minutes on a public repo; a generous free monthly
+allowance on a private one, and each run here takes well under a minute).
+
 ## Performance
 
 `MlbStatsApiSource` batches instead of doing one request per batter:
@@ -162,6 +197,9 @@ python scripts/refresh_park_factors.py
 # (needs requirements-analysis.txt):
 pip install -r requirements-analysis.txt
 python scripts/fit_hit_probability_model.py
+
+# Render the static site locally (see Hosted site below for publishing it):
+python scripts/generate_site.py --days 3 --out _site
 ```
 
 ## Known gaps
@@ -177,6 +215,15 @@ python scripts/fit_hit_probability_model.py
   fitted weights are a reasonable current estimate, not a settled result.
 - No accounting for a batter's own recent injury/rest status, or same-day
   lineup changes after prediction time.
+- **Batting order position isn't a feature yet.** Leadoff-type hitters
+  reliably get more plate appearances per game than the #9 spot, which
+  should matter for hit probability independent of who's hitting — and
+  it's cheap to add: the confirmed-lineup boxscore call already returns
+  each starter's order position, just unused right now. Worth backtesting
+  the same way `pitcher_oba_against` and platoon were (see
+  [Model backtest](#model-backtest)) before trusting it, since it needs
+  its own per-game data pull (order position isn't in the season gameLog
+  endpoint the backtest currently uses) — planned, not done yet.
 
 ## Tests
 

@@ -52,6 +52,18 @@ def test_favorable_platoon_split_raises_probability():
     )
 
 
+def test_unconfirmed_pitcher_is_flagged_in_reasons():
+    matchup = make_matchup(pitcher=make_pitcher(confirmed=False))
+    pick = score_matchup(matchup)
+    assert any("not yet announced" in reason for reason in pick.reasons)
+
+
+def test_confirmed_pitcher_has_no_tbd_reason():
+    matchup = make_matchup(pitcher=make_pitcher(confirmed=True))
+    pick = score_matchup(matchup)
+    assert not any("not yet announced" in reason for reason in pick.reasons)
+
+
 def test_rank_matchups_sorts_descending():
     hot = make_matchup(recent_form=make_recent_form([1] * 10))
     cold = make_matchup(recent_form=make_recent_form([0] * 10))

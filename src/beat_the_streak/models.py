@@ -12,6 +12,9 @@ class Pitcher:
     throws: str  # "L" or "R"
     era: float
     oba_against: float  # opponent batting average against, all batters
+    # False for a same-team placeholder used when a game's starter hasn't
+    # been announced yet (common a few days out) -- see MlbStatsApiSource.
+    confirmed: bool = True
 
 
 @dataclass(frozen=True)

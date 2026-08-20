@@ -67,16 +67,19 @@ def score_matchup(matchup: Matchup) -> Pick:
     hit_probability = 1.0 / (1.0 + math.exp(-linear))
     hit_probability = min(max(hit_probability, MIN_HIT_PROB), MAX_HIT_PROB)
 
-    reasons = _explain(features, platoon_delta)
+    reasons = _explain(features, platoon_delta, matchup.pitcher.confirmed)
     return Pick(matchup=matchup, hit_probability=hit_probability, reasons=reasons)
 
 
-def _explain(features: BatterFeatures, platoon_delta: float) -> list[str]:
+def _explain(features: BatterFeatures, platoon_delta: float, pitcher_confirmed: bool) -> list[str]:
     """Human-readable reasons behind the score. Purely descriptive -- these
     thresholds don't feed the model, they just surface which signals stand
     out for this matchup.
     """
     reasons: list[str] = []
+
+    if not pitcher_confirmed:
+        reasons.append("opposing starter not yet announced -- using a league-average assumption")
 
     if features.recent_form_avg - features.season_avg >= 0.040:
         reasons.append(
