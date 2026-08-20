@@ -345,6 +345,30 @@ variance sample; career average already captures the player's true
 talent level far more reliably, so "hot streaks" mostly look like noise
 once that's controlled for.
 
+**Statcast/Baseball Savant, tested and not shipped:** exit velocity,
+barrel rate, expected batting average (xBA/xwOBA/xSLG), sprint speed,
+whiff rate, and pitcher-side equivalents (`scripts/statcast.py` fetches
+season-level leaderboards from Savant's public CSV export,
+`scripts/test_statcast.py` tests them) -- same true-2026-holdout
+methodology, 17 candidates, each lagged by one season (Statcast
+leaderboards are season aggregates, so each row uses the *prior*
+completed season's profile; see statcast.py's docstring for why a
+single lag rather than a multi-year blend). Batter-side quality-of-
+contact metrics (xBA, xwOBA, xSLG, exit velocity, barrel rate) mostly
+made holdout log loss *worse* individually -- they largely re-measure
+what `career_avg`/`career_obp` already capture, so they added redundant
+noise rather than new signal. A few pitcher-side metrics (xBA, whiff%,
+K%, BB%, barrel rate allowed) nudged log loss down a little individually
+(0.6468 -> ~0.6466), but **all 17 together scored worse than the shipped
+model** (0.6470 vs. 0.6468 log loss, 0.5425 vs. 0.5441 AUC) -- the same
+dilution pattern seen elsewhere in this project when weakly-signaled
+features get added in bulk. None of the individual gains clear a bar
+worth trusting over noise (they're the same tiny magnitude that
+separated the shipped model from the random-forest candidate rejected
+for being non-monotonic), and Baseball Savant's leaderboard endpoint is
+an unofficial, undocumented CSV export -- a real added fragility for a
+benefit that isn't clearly established. Not implemented.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes
