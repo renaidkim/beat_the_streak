@@ -180,6 +180,13 @@ def fetch_season_raw(season: int, end_date: str | None = None) -> dict:
 
     print(f"[{season}] Fetching boxscores for batting order ({len(final_games)} games)...")
     batting_order: dict[tuple[str, int, int], int] = {}
+    # (team_id, date, outs, earned_runs) for every reliever appearance --
+    # extracted from the same boxscore fetch above, no extra requests.
+    # gamesStarted==0 in a boxscore pitching line means that appearance
+    # was in relief, not a start (verified directly against a real
+    # boxscore: the actual starter has gamesStarted=1, every other
+    # pitcher who appeared that game has 0).
+    bullpen_appearances: list[tuple[int, str, int, int]] = []
     for i, g in enumerate(final_games):
         box = cached_get(f"{BASE}/game/{g['gamePk']}/boxscore", params={})
         date = g["officialDate"]
@@ -191,6 +198,12 @@ def fetch_season_raw(season: int, end_date: str | None = None) -> dict:
                     order = int(order)
                     if order % 100 == 0:
                         batting_order[(date, team_id, pdata["person"]["id"])] = order // 100
+                pstats = pdata.get("stats", {}).get("pitching")
+                if pstats and pstats.get("gamesStarted") == 0:
+                    outs = int(pstats.get("outs", 0))
+                    er = int(pstats.get("earnedRuns", 0))
+                    if outs > 0:
+                        bullpen_appearances.append((team_id, date, outs, er))
         if (i + 1) % 400 == 0:
             print(f"[{season}]   {i + 1}/{len(final_games)}")
 
@@ -201,6 +214,7 @@ def fetch_season_raw(season: int, end_date: str | None = None) -> dict:
         "pitcher_hand": pitcher_hand,
         "schedule_map": schedule_map,
         "batting_order": batting_order,
+        "bullpen_appearances": bullpen_appearances,
     }
 
 

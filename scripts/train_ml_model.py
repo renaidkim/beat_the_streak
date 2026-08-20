@@ -312,6 +312,7 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                                 "date": r["date"],
                                 "batter_id": bid,
                                 "pitcher_id": pid,
+                                "opponent_team_id": r["opponent_team_id"],
                                 "career_avg": bcareer["avg"],
                                 "career_obp": bcareer["obp"],
                                 "career_slg": bcareer["slg"],

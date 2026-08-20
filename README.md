@@ -383,6 +383,37 @@ instead of 12, one fewer live API field), but there's no measured
 accuracy cost *or* benefit either way, so it wasn't judged worth the
 code churn absent an actual improvement.
 
+**Opposing bullpen quality, tested two ways -- the second one changed
+the answer:** a batter's 2nd/3rd/4th plate appearances in a game are
+often against relievers, not the probable starter the model already
+sees, so this looked like a real gap. `scripts/test_bullpen.py` first
+tried the *prior completed season's* team bullpen ERA (MLB Stats API's
+`byDateRange` stat type silently ignores `sitCodes`, verified directly
+by comparing a relief-only query against the whole-staff number for the
+same date range and getting identical results back -- so a true
+mid-season split isn't available that way). That version looked
+promising: log loss 0.6468 -> 0.6464, and 91% of a 2000-draw paired
+bootstrap favored including it. Promising enough, and hobbled by
+staleness badly enough (bullpens churn within a season -- trades,
+injuries, callups -- far more than a hitter's underlying skill does),
+that it was worth reconstructing properly: `scripts/test_bullpen_pit.py`
+rebuilds a true point-in-time bullpen ERA per team per date from
+boxscores already fetched for batting order (a boxscore pitching line
+with `gamesStarted == 0` is a relief appearance -- no new network calls,
+just more parsing of data already cached), summing only appearances
+strictly before each row's date. That version came out **worse** than
+the baseline (log loss 0.6468 -> 0.6470) with only 11% of the bootstrap
+favoring it -- the signal reversed. Likely explanation: the prior-season
+number's apparent lift wasn't really about bullpen quality -- it was
+probably proxying for overall team quality (good teams tend to have
+both good bullpens and good everyday lineups the model already sees via
+`career_avg`/`career_obp`) -- and the true point-in-time number is very
+noisy early in a season (a bullpen's ERA after a handful of innings can
+be 0.00 or 15.00 by small-sample luck), adding noise rather than signal.
+Not implemented. Worth remembering as a general lesson: a feature that
+looks good on an admittedly-flawed proxy needs to survive the properly-
+built version before it ships, not just the first version that compiles.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes
