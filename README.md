@@ -508,6 +508,46 @@ printed comparison and permutation importances before promoting —
 this one, but is kept for now as the historical baseline the retrain
 compares against.
 
+### Season-to-date average, re-verified (not the same question as recent form)
+
+Reasonable pushback after round four: recent form (5-10 games) being
+noise is one thing, but a full season's cumulative average -- hundreds
+of at-bats by midseason -- is a categorically larger, lower-variance
+sample. Doesn't a .300 career hitter batting .230 this season deserve a
+lower prediction than his career average alone suggests? The original
+"season average adds nothing" finding (round one/two) was from the old
+single-season logistic regression pipeline on 2025 data only, and had
+never been re-checked against the current multi-season/GBM pipeline --
+worth actually re-verifying rather than assuming it still holds.
+
+`scripts/test_season_avg.py` tests `season_avg_delta` (season-to-date
+average minus career average -- no new data needed, `season_avg_to_date`
+is already computed by `build_dataset`). Aggregate result confirms the
+old finding: log loss 0.6466 -> 0.6466 (no change), permutation
+importance +0.00006, bootstrap 57% one-sided (a coin flip). More
+tellingly, direct point-checks (a .300 career hitter swept from .350
+down to .150 this season, across four different game contexts) show the
+model is **essentially flat for any degree of underperformance** --
+there's a small real bump for outperforming career average, but a
+season-long slump barely moves the prediction anywhere tested. To rule
+out that this was just the constrained model's coarse binning in a
+sparse region (~8.5% of training rows have a slump this severe), the
+same test was rerun with an unconstrained random forest -- log loss got
+worse with the feature added, and the point-check came back flat and
+non-monotonic (consistent with noise, not a real relationship the
+constrained model was missing).
+
+Not implemented -- genuinely no detectable value here, not a modeling
+artifact. Best explanation is regression to the mean, one of
+sabermetrics' most established findings: batting average has enormous
+BABIP-driven variance, and a career-length sample is a more reliable
+estimate of true talent than a partial season, even a badly slumping
+one -- the same reasoning real projection systems (Marcel, ZiPS,
+Steamer) use to weight multiple years over the current season. This
+doesn't rule out that a *specific cause* behind a slump (injury, a real
+swing change) could matter -- the model has no way to see that either
+way, only the raw average.
+
 ## Why same-pitcher picks aren't avoided
 
 `pick_top` used to skip a pick if it shared an opposing pitcher with one
