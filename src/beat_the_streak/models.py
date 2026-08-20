@@ -56,6 +56,13 @@ class Matchup:
     # (future days, or today's lineup not posted yet) -- rank.py imputes
     # a neutral default rather than requiring this.
     batting_order: int | None = None
+    # This batter's history against this specific opposing pitcher: their
+    # average against that pitcher minus their own season-to-date average,
+    # i.e. how much better/worse they've hit this particular matchup than
+    # they've hit overall. A property of the pair, not either player alone
+    # -- see beat_the_streak.data._get_bvp_delta. 0.0 (neutral) when
+    # there's no prior meeting, or the pitcher isn't confirmed yet.
+    bvp_delta: float = 0.0
 
 
 @dataclass(frozen=True)

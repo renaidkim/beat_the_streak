@@ -29,16 +29,17 @@ game (pick 1-2 batters/day who you think will record a hit).
      as a "TBD" badge and called out in that pick's reasons) so the page
      still has something useful to look at before starters are set —
      just revisit closer to game time as real lineups and starters post.
-2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into 12
+2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into 13
    signals: batting order slot, the opposing pitcher's career
    strikeouts-per-9 and career ERA (both entering this season) and
    season-to-date average against, park factor, the batter's career
    average/OBP/strikeout rate/walk rate (career, entering this season),
-   age, and both players' handedness.
+   age, both players' handedness, and this batter's own history against
+   this specific opposing pitcher.
 3. **Ranking** (`beat_the_streak/rank.py`) — a gradient-boosted model, fit
    on multiple past seasons of outcomes and validated on a season it
    never saw, predicts P(hit) directly from those signals. See
-   [Model backtest](#model-backtest) below for the three rounds of
+   [Model backtest](#model-backtest) below for the four rounds of
    testing that produced this specific feature set and model type — it
    did not start out looking like this. Picking the top N picks purely by
    probability, *including* two batters who share a pitcher — see
@@ -443,6 +444,51 @@ comfortably spanning zero, 57% of draws favoring it -- a coin flip, not
 the lopsided 91% the bullpen proxy showed before it reversed. Not
 implemented.
 
+### Round four: batter-vs-pitcher history
+
+Six ideas tested in a row above with no real gain (recent form, three
+seasons of Statcast data, feature pruning, bullpen quality twice,
+opposing defense, calibration) raised a fair question: was the model
+near its practical ceiling given what's cheaply available? One more
+idea changed the answer. The MLB Stats API endpoint for a batter's
+history against one specific pitcher (`vsPlayer`) needs one request per
+(batter, pitcher) pair -- no batching -- and the training set has
+~28,500 distinct pairs across 2023-2026, so backtesting it directly
+would mean tens of thousands of individual requests against an
+undocumented public API. Instead, the backtest computed it from data
+already fetched for the rest of the pipeline: every batter's own game
+logs already identify the opposing pitcher per game, so a batter's
+at-bats/hits against that exact pitcher, strictly before each row's
+date, cost nothing extra to reconstruct -- with the honest limitation
+that it can only see meetings from 2023 onward, not a batter's full
+career against a given pitcher.
+
+Even that undercounted version came back clearly positive: log loss
+0.6468 -> 0.6466, and **94.8% of a 2000-draw paired bootstrap favored
+including it** -- the most one-sided result of everything tested in
+rounds three and four (the bullpen-quality proxy's initial 91% is the
+next closest, and that one reversed under a properly-built version).
+Two things made this more trustworthy than the bullpen result before it
+reversed: there's no obvious confound (bullpen ERA plausibly proxied for
+"good team" generally; a specific batter-pitcher relationship doesn't
+have an equivalent shortcut explanation), and the *live* version is
+actually stronger than what got backtested -- production can call
+`vsPlayer` for just that day's actual matchups (a few hundred pairs, not
+28,500), getting true full-career history rather than a 2023-2026 slice.
+Verified monotonic (a batter who's clearly struggled against this
+specific pitcher scores lower; the effect flattens out above roughly
+neutral history) by point-check before shipping, same discipline as
+every other monotonic constraint in this model.
+
+Promoted to production as `bvp_delta` (delta vs. the batter's own
+season-to-date average, same reparametrization as `platoon_delta` and
+every other delta feature here) -- the model is now 13 features. Live
+integration (`MlbStatsApiSource._get_bvp_delta`) is the one place in
+this whole data layer that isn't batched: it's one HTTP request per
+matchup, which took a real slate from ~2 seconds to ~35-40 seconds (see
+[Performance](#performance)) -- a deliberate tradeoff given the
+strength of the result, not an oversight.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes
@@ -538,6 +584,16 @@ real, completed 15-game slate (270 starting batters): **23 HTTP
 requests, ~2 seconds**, versus roughly 850 requests the naive
 one-request-per-batter version would have made.
 
+One exception: batter-vs-pitcher history (`bvp_delta`, added in the
+"Model backtest" section below) uses MLB's `vsPlayer` stat type, which
+has no batching -- one request per (batter, pitcher) pair, unlike
+everything else above. That's roughly one extra request per matchup
+(~150-270/day depending on how many games and confirmed lineups), which
+brought a full slate from ~2 seconds to **~35-40 seconds**. Still well
+under any GitHub Actions timeout and fine for a page that refreshes
+twice a day plus on demand, but a real, deliberate tradeoff -- not free
+like the rest of the batching in this file.
+
 ## Usage
 
 ```bash
@@ -616,6 +672,23 @@ python scripts/generate_site.py --days 3 --out _site
   in real games that day, not just a fixed top-100 list). It's a
   reasonable proxy — Beat the Streak strategy already favors picking
   everyday, high-PA hitters — but not an exact one.
+- `bvp_delta`'s backtest (round four) only sees batter-vs-pitcher
+  meetings from 2023 onward, not a batter's true full career against a
+  given pitcher — the live app doesn't have this limitation (it calls
+  `vsPlayer` fresh per matchup, full career), so live behavior for a
+  long-tenured pair is based on more information than what was
+  validated. The `vsPlayer` stat type is also the one MLB Stats API
+  endpoint this app depends on that isn't batchable, and its response
+  shape (a `season: null` aggregate row alongside per-season splits) was
+  discovered by direct inspection rather than documented anywhere — if
+  MLB changes that shape, `_get_bvp_delta` would need updating, not just
+  a version-pin.
+- The doubleheader edge case in `_compute_bvp_history` (two games can
+  share a `(batter, pitcher, date)` key, since `schedule_map` only
+  tracks one pitcher per date+team) is resolved by dropping the
+  duplicate rather than fixing the underlying ambiguity — affects
+  roughly 1% of computed history rows in the backtest, not the live app
+  (which fetches real full-career history per matchup instead).
 
 ## Tests
 

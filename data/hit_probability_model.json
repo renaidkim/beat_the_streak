@@ -12,7 +12,8 @@
     "pitcher_era_career",
     "career_k_rate",
     "batter_age",
-    "career_bb_rate"
+    "career_bb_rate",
+    "bvp_delta"
   ],
   "pkl_path": "hit_probability_model.pkl",
   "metadata": {
@@ -26,44 +27,82 @@
     "n_test_rows": 10222,
     "candidate_comparison": {
       "logreg": {
-        "log_loss": 0.6479629964690776,
-        "brier": 0.22778485679278193,
-        "auc": 0.5355559159868242
+        "log_loss": 0.6479405174419005,
+        "brier": 0.22777436287812394,
+        "auc": 0.5356996065222134
       },
       "random_forest": {
-        "log_loss": 0.646275408506225,
-        "brier": 0.22701222745621227,
-        "auc": 0.5458199926614518
+        "log_loss": 0.6461394781456621,
+        "brier": 0.22695087265229502,
+        "auc": 0.5466389469874756
       },
       "gbm": {
-        "log_loss": 0.6468062734413543,
-        "brier": 0.2272591360786492,
-        "auc": 0.5440594326015531
+        "log_loss": 0.6466430074371152,
+        "brier": 0.22718223549999858,
+        "auc": 0.5443139767073388
       },
       "mlp": {
-        "log_loss": 0.6507462824273029,
-        "brier": 0.2290315379871068,
-        "auc": 0.5323761158962553
+        "log_loss": 0.6486858073719691,
+        "brier": 0.2281031455414409,
+        "auc": 0.5391776425322308
       }
     },
     "shipped_model_v1_on_2026": {
-      "log_loss": 0.6477430586249523,
-      "brier": 0.22768835813729596,
-      "auc": 0.5361018017162815
+      "log_loss": 0.6481788575332623,
+      "brier": 0.22787705345414064,
+      "auc": 0.5344165759825785
     },
     "prior_production_model": {
-      "description": "v1: 6-feature GBM (career_avg, platoon_delta, pitcher_oba_against, park_factor, is_home, batting_order), trained/validated with a within-2025-season date split only.",
-      "within_season_2025_holdout_metrics_at_fit_time": {
-        "log_loss": 0.64492514625245,
-        "brier": 0.22647538941640857,
-        "auc": 0.5818612095777352
+      "train_seasons": [
+        2023,
+        2024,
+        2025
+      ],
+      "test_season": 2026,
+      "n_train_rows": 37317,
+      "n_test_rows": 10222,
+      "candidate_comparison": {
+        "logreg": {
+          "log_loss": 0.6479629964690776,
+          "brier": 0.22778485679278193,
+          "auc": 0.5355559159868242
+        },
+        "random_forest": {
+          "log_loss": 0.646275408506225,
+          "brier": 0.22701222745621227,
+          "auc": 0.5458199926614518
+        },
+        "gbm": {
+          "log_loss": 0.6468062734413543,
+          "brier": 0.2272591360786492,
+          "auc": 0.5440594326015531
+        },
+        "mlp": {
+          "log_loss": 0.6507462824273029,
+          "brier": 0.2290315379871068,
+          "auc": 0.5323761158962553
+        }
       },
-      "scored_on_true_2026_holdout": {
-        "log_loss": 0.647796095388469,
-        "brier": 0.22771480194567997,
-        "auc": 0.5332748051628007
-      }
+      "shipped_model_v1_on_2026": {
+        "log_loss": 0.6477430586249523,
+        "brier": 0.22768835813729596,
+        "auc": 0.5361018017162815
+      },
+      "prior_production_model": {
+        "description": "v1: 6-feature GBM (career_avg, platoon_delta, pitcher_oba_against, park_factor, is_home, batting_order), trained/validated with a within-2025-season date split only.",
+        "within_season_2025_holdout_metrics_at_fit_time": {
+          "log_loss": 0.64492514625245,
+          "brier": 0.22647538941640857,
+          "auc": 0.5818612095777352
+        },
+        "scored_on_true_2026_holdout": {
+          "log_loss": 0.647796095388469,
+          "brier": 0.22771480194567997,
+          "auc": 0.5332748051628007
+        }
+      },
+      "note": "random_forest scored marginally better on this same 2026 holdout (log_loss 0.6463 vs this gbm's 0.6468) but was rejected: sklearn's RandomForestClassifier has no monotonic-constraint mechanism, and direct point-checks showed it predicting a .230 career hitter below a .200 one at otherwise-default features -- the same backwards-prediction pathology monotonic_cst was introduced to fix in the original 6-feature model. This gbm has monotonic_cst applied (see scripts/train_ml_model.py MONOTONIC_CST) and was verified by point-checks across every constrained feature before shipping."
     },
-    "note": "random_forest scored marginally better on this same 2026 holdout (log_loss 0.6463 vs this gbm's 0.6468) but was rejected: sklearn's RandomForestClassifier has no monotonic-constraint mechanism, and direct point-checks showed it predicting a .230 career hitter below a .200 one at otherwise-default features -- the same backwards-prediction pathology monotonic_cst was introduced to fix in the original 6-feature model. This gbm has monotonic_cst applied (see scripts/train_ml_model.py MONOTONIC_CST) and was verified by point-checks across every constrained feature before shipping."
+    "note": "Adds bvp_delta (batter history vs. this specific opposing pitcher, delta vs season-to-date average) to the prior 12-feature model. Found via scripts/test_bvp.py (since removed -- superseded by this production integration; see git history and README for the original finding: 94.8% of a 2000-draw bootstrap favored including it, no obvious confound mechanism unlike the rejected bullpen-quality feature). Verified monotonic (non-decreasing in bvp_delta) by point-check before shipping."
   }
 }

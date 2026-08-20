@@ -74,6 +74,7 @@ class MlbStatsApiSource(DataSource):
     def __init__(self, session: requests.Session | None = None) -> None:
         self._session = session or requests.Session()
         self._roster_cache: dict[int, list[int]] = {}
+        self._bvp_cache: dict[tuple[int, int], float] = {}
 
     def get_matchups(self, date: str) -> list[Matchup]:
         games = self._get_schedule_with_probables(date)
@@ -133,6 +134,11 @@ class MlbStatsApiSource(DataSource):
                 batter = batters.get(batter_id)
                 if batter is None:
                     continue
+                bvp_delta = (
+                    self._get_bvp_delta(batter_id, pitcher_id, batter.season_avg)
+                    if isinstance(pitcher_id, int)
+                    else 0.0  # TBD placeholder pitcher -- no specific pitcher to have history against
+                )
                 matchups.append(
                     Matchup(
                         batter=batter,
@@ -140,9 +146,51 @@ class MlbStatsApiSource(DataSource):
                         is_home=gm["is_home"],
                         park_factor=gm["park_factor"],
                         batting_order=slot,
+                        bvp_delta=bvp_delta,
                     )
                 )
         return matchups
+
+    def _get_bvp_delta(self, batter_id: int, pitcher_id: int, season_avg: float) -> float:
+        """This batter's history against this specific pitcher, delta vs.
+        their own season-to-date average. MLB's vsPlayer stat type needs
+        one request per (batter, pitcher) pair -- no batching -- so this
+        is only feasible called once per matchup during a live slate
+        build (a few hundred requests/day), not for backtesting training
+        data (tens of thousands of pairs); see
+        scripts/train_ml_model.py's _compute_bvp_history for the cheaper,
+        truncated-window proxy used there instead.
+
+        The response includes a season=None aggregate row *in addition
+        to* the per-season breakdown (verified directly against the live
+        API) -- summing everything would double-count, so only the
+        dated, per-season splits are summed here.
+        """
+        cache_key = (batter_id, pitcher_id)
+        if cache_key in self._bvp_cache:
+            return self._bvp_cache[cache_key]
+        resp = self._session.get(
+            f"{MLB_STATS_API_BASE}/people/{batter_id}/stats",
+            params={
+                "stats": "vsPlayer",
+                "opposingPlayerId": pitcher_id,
+                "group": "hitting",
+                "sportId": 1,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        ab = hits = 0
+        for stat_group in resp.json().get("stats", []):
+            for split in stat_group.get("splits", []):
+                if split.get("season") is None:
+                    continue  # career-aggregate row, already covered below
+                stat = split.get("stat", {})
+                ab += int(stat.get("atBats", 0))
+                hits += int(stat.get("hits", 0))
+        delta = (hits / ab - season_avg) if ab > 0 else 0.0
+        self._bvp_cache[cache_key] = delta
+        return delta
 
     def _get_schedule_with_probables(self, date: str) -> list[dict[str, Any]]:
         resp = self._session.get(

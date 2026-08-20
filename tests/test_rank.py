@@ -43,6 +43,21 @@ def test_higher_strikeout_pitcher_lowers_probability():
     )
 
 
+def test_poor_history_against_this_pitcher_lowers_probability():
+    # bvp_delta's effect in the shipped model is concentrated at
+    # strongly negative values (verified by point-check when the
+    # feature was added) -- a batter who's clearly struggled against
+    # this specific pitcher scores lower; the effect flattens out
+    # above roughly neutral history, similar to how platoon_delta is
+    # conditionally rather than uniformly important.
+    struggled = make_matchup(bvp_delta=-0.35)
+    neutral = make_matchup(bvp_delta=0.0)
+    assert (
+        score_matchup(struggled).hit_probability
+        < score_matchup(neutral).hit_probability
+    )
+
+
 def test_hitter_friendly_park_raises_probability():
     neutral = make_matchup(park_factor=1.0)
     hitter_park = make_matchup(park_factor=1.15)

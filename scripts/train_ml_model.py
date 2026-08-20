@@ -10,6 +10,7 @@ unless something wasn't fetched).
 from __future__ import annotations
 
 import datetime
+import functools
 import json
 import sys
 from pathlib import Path
@@ -59,6 +60,7 @@ FEATURE_COLS = [
     "batting_order", "pitcher_k9_career", "park_factor", "career_avg",
     "pitcher_oba_against", "bats_L", "career_obp", "pitcher_throws_L",
     "pitcher_era_career", "career_k_rate", "batter_age", "career_bb_rate",
+    "bvp_delta",
 ]
 
 # Domain-asserted monotonic direction per feature above, for
@@ -71,7 +73,7 @@ FEATURE_COLS = [
 # point-checks. sklearn's RandomForestClassifier has no equivalent
 # constraint, which is why it's excluded from MONOTONIC_SAFE_CANDIDATES
 # below despite scoring best on raw holdout log loss.
-MONOTONIC_CST = [-1, -1, 1, 1, 1, 0, 1, 0, 1, -1, 0, 0]
+MONOTONIC_CST = [-1, -1, 1, 1, 1, 0, 1, 0, 1, -1, 0, 0, 1]
 
 # Only candidates where a backwards-prediction pathology can't sneak
 # through get to be the "winner" that's actually shipped -- logistic
@@ -160,6 +162,68 @@ def fetch_batter_bats(batter_ids: set[int]) -> dict[int, str]:
 
 
 # -------------------------------------------------------------- dataset ---
+
+
+@functools.lru_cache(maxsize=1)
+def _compute_bvp_history() -> pd.DataFrame:
+    """One row per (batter_id, pitcher_id, date) with that batter's prior
+    at-bats/hits against that exact pitcher, accumulated across ALL of
+    TRAIN_SEASONS + [TEST_SEASON] in true chronological order -- always
+    the full window regardless of which subset build_dataset() is
+    currently building rows for, so a 2026 test row can see history
+    established in 2023-2025 training seasons. Computed once (lru_cache)
+    since build_dataset() is called separately for train and test.
+
+    No new network calls -- reuses the same cached batter gameLogs and
+    schedule_map already fetched for the rest of the pipeline.
+    """
+    all_seasons = list(TRAIN_SEASONS) + [TEST_SEASON]
+    raw_by_season = {}
+    for season in all_seasons:
+        end_date = datetime.date.today().isoformat() if season == TEST_SEASON else None
+        raw_by_season[season] = fetch_season_raw(season, end_date=end_date)
+
+    games_by_batter: dict[int, list[tuple[str, int, int, int | None]]] = {}
+    for season in all_seasons:  # all_seasons already increasing
+        raw = raw_by_season[season]
+        schedule_map = raw["schedule_map"]
+        for bid, splits in raw["batter_logs"].items():
+            for s in sorted(splits, key=lambda s: s["date"]):
+                date = s["date"]
+                team_id = s["team"]["id"]
+                pid = schedule_map.get((date, team_id))
+                games_by_batter.setdefault(bid, []).append(
+                    (date, int(s["stat"].get("atBats", 0)), int(s["stat"].get("hits", 0)), pid)
+                )
+
+    out_rows = []
+    for bid, games in games_by_batter.items():
+        vs_ab: dict[int, int] = {}
+        vs_hits: dict[int, int] = {}
+        for date, ab, hits, pid in games:
+            if pid is not None:
+                out_rows.append(
+                    {
+                        "batter_id": bid,
+                        "pitcher_id": pid,
+                        "date": date,
+                        "bvp_ab_prior": vs_ab.get(pid, 0),
+                        "bvp_hits_prior": vs_hits.get(pid, 0),
+                    }
+                )
+                vs_ab[pid] = vs_ab.get(pid, 0) + ab
+                vs_hits[pid] = vs_hits.get(pid, 0) + hits
+
+    bvp_df = pd.DataFrame(out_rows)
+    if len(bvp_df):
+        # Doubleheaders: two games can share a (batter, pitcher, date)
+        # key since schedule_map only tracks one pitcher per date+team.
+        # Drop to keep downstream merges 1:1 -- a small, known
+        # imprecision (the dropped game's own AB/hits don't get folded
+        # into a later "prior" count), not worth a bigger fix for a
+        # ~1%-of-rows edge case.
+        bvp_df = bvp_df.drop_duplicates(subset=["batter_id", "pitcher_id", "date"], keep="first")
+    return bvp_df
 
 
 def build_dataset(seasons: list[int]) -> pd.DataFrame:
@@ -356,6 +420,20 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                 prior_games.append((r["date"], r["at_bats"], r["hits"]))
 
     df = pd.DataFrame(out_rows)
+
+    bvp_df = _compute_bvp_history()
+    n_before = len(df)
+    df = df.merge(bvp_df, on=["batter_id", "pitcher_id", "date"], how="left")
+    assert len(df) == n_before, "bvp merge changed row count -- join key isn't unique"
+    df["bvp_ab_prior"] = df["bvp_ab_prior"].fillna(0)
+    df["bvp_hits_prior"] = df["bvp_hits_prior"].fillna(0)
+    df["bvp_delta"] = np.where(
+        df["bvp_ab_prior"] > 0,
+        df["bvp_hits_prior"] / df["bvp_ab_prior"] - df["season_avg_to_date"],
+        0.0,
+    )
+    df = df.drop(columns=["bvp_ab_prior", "bvp_hits_prior"])
+
     df["date"] = pd.to_datetime(df["date"])
     return df
 

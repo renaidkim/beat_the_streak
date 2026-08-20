@@ -2,22 +2,26 @@
 pick the best options for a Beat the Streak entry.
 
 The model (data/hit_probability_model.json / .pkl) predicts P(batter gets
->=1 hit in this game) from 12 features: the batter's slot in the batting
+>=1 hit in this game) from 13 features: the batter's slot in the batting
 order, the opposing pitcher's career strikeouts-per-9 and career ERA
 (both entering this season, i.e. prior seasons only) and season-to-date
 average against, park factor, the batter's career average/OBP/strikeout
-rate/walk rate (career, entering this season), age, and both players'
-handedness.
+rate/walk rate (career, entering this season), age, both players'
+handedness, and this batter's own history against this specific
+opposing pitcher (delta vs. their season-to-date average).
 
-These 12 were chosen by permutation importance out of a broader ~24-
-feature set (scripts/train_ml_model.py) that also tried platoon split,
-home/away, rest days since last game, month of season, and several more
-career rate stats for both sides -- all came back with ~zero or negative
-importance on a true out-of-time holdout and were cut. The model is
-trained on 2023-2025 and validated on 2026, a season it never saw during
-fitting or feature selection -- see the README's "Model backtest"
-section for the full history, including the earlier 6-feature version
-this replaced.
+Most of these were chosen by permutation importance out of a broader
+~24-feature set (scripts/train_ml_model.py) that also tried platoon
+split, home/away, rest days since last game, month of season, and
+several more career rate stats for both sides -- all came back with
+~zero or negative importance on a true out-of-time holdout and were
+cut. Batter-vs-pitcher history was added later, after separately testing
+opposing bullpen quality and opposing team defense (also rejected --
+see the README's "Model backtest" section) turned up nothing. The
+model is trained on 2023-2025 and validated on 2026, a season it never
+saw during fitting or feature selection -- see the README for the full
+history, including the earlier 6-feature and 12-feature versions this
+replaced.
 """
 
 from __future__ import annotations
@@ -97,6 +101,7 @@ def score_matchup(matchup: Matchup) -> Pick:
         "pitcher_throws_L": features.pitcher_throws_L,
         "park_factor": features.park_factor,
         "batting_order": features.batting_order,
+        "bvp_delta": features.bvp_delta,
     }
     hit_probability = _predict(row)
     hit_probability = min(max(hit_probability, MIN_HIT_PROB), MAX_HIT_PROB)
@@ -146,6 +151,11 @@ def _explain(features: BatterFeatures, pitcher_confirmed: bool) -> list[str]:
         reasons.append(f"batting near the top of the order ({int(features.batting_order)})")
     elif features.batting_order >= 8:
         reasons.append(f"batting near the bottom of the order ({int(features.batting_order)})")
+
+    if features.bvp_delta >= 0.100:
+        reasons.append(f"has hit this pitcher well historically ({features.bvp_delta:+.3f} vs. own season avg)")
+    elif features.bvp_delta <= -0.100:
+        reasons.append(f"has struggled against this pitcher historically ({features.bvp_delta:+.3f} vs. own season avg)")
 
     return reasons
 

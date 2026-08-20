@@ -34,6 +34,7 @@ class BatterFeatures:
     pitcher_throws_L: float  # 1.0 if the opposing pitcher throws left-handed, else 0.0
     park_factor: float
     batting_order: float  # 1-9, or DEFAULT_BATTING_ORDER when unknown
+    bvp_delta: float  # this batter's history vs. this specific pitcher, delta vs season avg
 
 
 def build_features(matchup: Matchup) -> BatterFeatures:
@@ -52,4 +53,5 @@ def build_features(matchup: Matchup) -> BatterFeatures:
         batting_order=float(matchup.batting_order)
         if matchup.batting_order is not None
         else DEFAULT_BATTING_ORDER,
+        bvp_delta=matchup.bvp_delta,
     )

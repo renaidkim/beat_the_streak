@@ -91,3 +91,51 @@ def test_starting_batters_uses_boxscore_batting_order_as_slot():
     boxscore = {"teams": {"home": {"battingOrder": [111, 222, 333]}}}
     lineup = source._get_starting_batters(boxscore, "home", team_id=1)
     assert lineup == {111: 1, 222: 2, 333: 3}
+
+
+class _FakeResponse:
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict:
+        return self._payload
+
+
+class _FakeSession:
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    def get(self, *args, **kwargs):
+        return _FakeResponse(self._payload)
+
+
+def test_bvp_delta_excludes_season_none_aggregate_row():
+    # The vsPlayer endpoint's response includes a season=None row that's
+    # already the sum of the per-season rows below it (verified directly
+    # against the live API) -- summing everything would double-count.
+    payload = {
+        "stats": [
+            {
+                "splits": [
+                    {"season": None, "stat": {"atBats": 6, "hits": 2}},  # aggregate, excluded
+                    {"season": "2018", "stat": {"atBats": 2, "hits": 1}},
+                    {"season": "2019", "stat": {"atBats": 1, "hits": 1}},
+                    {"season": "2024", "stat": {"atBats": 3, "hits": 0}},
+                ]
+            }
+        ]
+    }
+    source = MlbStatsApiSource(session=_FakeSession(payload))
+    delta = source._get_bvp_delta(batter_id=1, pitcher_id=2, season_avg=0.250)
+    # (1 + 1 + 0) / (2 + 1 + 3) - 0.250, not (2+1+1+0)/(6+2+1+3)
+    assert delta == (1 + 1 + 0) / (2 + 1 + 3) - 0.250
+
+
+def test_bvp_delta_zero_when_no_prior_meeting():
+    payload = {"stats": [{"splits": []}]}
+    source = MlbStatsApiSource(session=_FakeSession(payload))
+    delta = source._get_bvp_delta(batter_id=1, pitcher_id=2, season_avg=0.250)
+    assert delta == 0.0
