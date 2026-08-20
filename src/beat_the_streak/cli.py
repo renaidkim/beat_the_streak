@@ -81,9 +81,10 @@ def _print_pick(rank: int, pick) -> None:
     m = pick.matchup
     loc = "vs" if m.is_home else "@"
     reasons = "; ".join(pick.reasons) if pick.reasons else "no standout factors"
+    started = " [GAME STARTED -- not selectable]" if m.game_started else ""
     print(
         f"{rank:>2}. {m.batter.name:<22} {pick.hit_probability:>5.1%}  "
-        f"{loc} {m.pitcher.name} ({m.pitcher.throws}HP)  -- {reasons}"
+        f"{loc} {m.pitcher.name} ({m.pitcher.throws}HP)  -- {reasons}{started}"
     )
 
 

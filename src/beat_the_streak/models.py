@@ -63,6 +63,12 @@ class Matchup:
     # -- see beat_the_streak.data._get_bvp_delta. 0.0 (neutral) when
     # there's no prior meeting, or the pitcher isn't confirmed yet.
     bvp_delta: float = 0.0
+    # True once this game has started (live or final) -- Beat the Streak
+    # only allows picking a player before their game begins, so rank.py's
+    # pick_top excludes these from the recommended picks while still
+    # showing them in a full ranked list. False for fixtures/tests, which
+    # have no real-time concept.
+    game_started: bool = False
 
 
 @dataclass(frozen=True)

@@ -190,12 +190,20 @@ def pick_top(
     give if independent. Avoiding that correlation only makes sense for
     an at-least-one-of-two bet, which isn't how this game scores a double
     down. Left in as an opt-in for anyone who wants to diversify anyway.
+
+    Matchups whose game has already started (`matchup.game_started`) are
+    never selected -- Beat the Streak only allows picking a player before
+    their game begins -- but they're still passed through untouched in
+    `ranked_picks` by the caller (rank_matchups), so a full ranked table
+    can keep showing them for reference.
     """
+    eligible = [p for p in ranked_picks if not p.matchup.game_started]
+
     selected: list[Pick] = []
     skipped: list[Pick] = []
     used_pitcher_ids: set[str] = set()
 
-    for pick in ranked_picks:
+    for pick in eligible:
         if len(selected) >= n:
             break
         pitcher_id = pick.matchup.pitcher.id
@@ -206,9 +214,9 @@ def pick_top(
         used_pitcher_ids.add(pitcher_id)
 
     # If avoiding correlation left us short (e.g. a tiny slate), fill the
-    # rest from the highest-probability remaining picks regardless.
+    # rest from the highest-probability remaining eligible picks regardless.
     if len(selected) < n:
-        for pick in ranked_picks:
+        for pick in eligible:
             if len(selected) >= n:
                 break
             if pick not in selected:

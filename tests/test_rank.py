@@ -98,6 +98,20 @@ def test_rank_matchups_sorts_descending():
     assert ranked[0].hit_probability >= ranked[1].hit_probability
 
 
+def test_pick_top_excludes_matchups_whose_game_has_started():
+    # Beat the Streak only allows picking a player before their game
+    # begins -- a started game's batters should never show up as a
+    # recommended pick, even if their probability is the highest.
+    started = make_matchup(batter=make_batter(id="b1", career_avg=0.320), game_started=True)
+    not_started = make_matchup(batter=make_batter(id="b2", career_avg=0.280), game_started=False)
+    ranked = rank_matchups([started, not_started])
+    assert ranked[0].matchup.batter.id == "b1"  # highest probability, but ineligible
+
+    result = pick_top(ranked, n=2)
+    picked_ids = {p.matchup.batter.id for p in result.picks}
+    assert picked_ids == {"b2"}  # only the eligible one -- no backfill from started games
+
+
 def test_pick_top_allows_same_pitcher_by_default():
     # MLB's double-down rule needs BOTH picks to hit; positive correlation
     # (two batters sharing a pitcher) helps a both-must-succeed bet rather

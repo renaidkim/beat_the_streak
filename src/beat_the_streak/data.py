@@ -95,6 +95,7 @@ class MlbStatsApiSource(DataSource):
         for game in games:
             park_factor = self._get_park_factor(game["teams"]["home"]["team"]["id"])
             boxscore = self._get_boxscore(game["gamePk"]) if is_today else {}
+            game_started = _game_has_started(game)
             for side, opponent_side in (("home", "away"), ("away", "home")):
                 team = game["teams"][side]["team"]
                 opp_pitcher_info = game["teams"][opponent_side].get("probablePitcher")
@@ -115,6 +116,7 @@ class MlbStatsApiSource(DataSource):
                         "lineup": lineup,  # batter_id -> slot (1-9) or None
                         "is_home": side == "home",
                         "park_factor": park_factor,
+                        "game_started": game_started,
                     }
                 )
 
@@ -147,6 +149,7 @@ class MlbStatsApiSource(DataSource):
                         park_factor=gm["park_factor"],
                         batting_order=slot,
                         bvp_delta=bvp_delta,
+                        game_started=gm["game_started"],
                     )
                 )
         return matchups
@@ -340,6 +343,15 @@ def _load_park_factors() -> dict[str, float]:
     return {team_id: entry["park_factor"] for team_id, entry in raw.items()}
 
 
+def _game_has_started(game: dict[str, Any]) -> bool:
+    """True once a game is live or final -- i.e. no longer "Preview"
+    (scheduled/pre-game/warmup). Beat the Streak only allows picking a
+    player before their game begins, so live and final are equally
+    unselectable; only the not-yet-started distinction matters here.
+    """
+    return game.get("status", {}).get("abstractGameState") != "Preview"
+
+
 def _stat_split(person: dict[str, Any], type_display_name: str) -> dict[str, Any]:
     for stat_group in person.get("stats", []):
         if stat_group.get("type", {}).get("displayName") == type_display_name:
@@ -476,6 +488,8 @@ class FixtureSource(DataSource):
                     is_home=entry["is_home"],
                     park_factor=entry["park_factor"],
                     batting_order=entry.get("batting_order"),
+                    bvp_delta=entry.get("bvp_delta", 0.0),
+                    game_started=entry.get("game_started", False),
                 )
             )
         return matchups

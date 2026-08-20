@@ -4,6 +4,7 @@ from beat_the_streak.data import (
     MlbStatsApiSource,
     _career_hitting_rates_entering_season,
     _career_pitching_rates_entering_season,
+    _game_has_started,
     _placeholder_pitcher,
 )
 from beat_the_streak.features import LEAGUE_AVG_AVG
@@ -84,6 +85,15 @@ def test_career_pitching_rates_none_when_no_prior_seasons():
         ]
     }
     assert _career_pitching_rates_entering_season(person, 2025) is None
+
+
+def test_game_has_started_false_for_preview():
+    assert _game_has_started({"status": {"abstractGameState": "Preview"}}) is False
+
+
+def test_game_has_started_true_for_live_and_final():
+    assert _game_has_started({"status": {"abstractGameState": "Live"}}) is True
+    assert _game_has_started({"status": {"abstractGameState": "Final"}}) is True
 
 
 def test_starting_batters_uses_boxscore_batting_order_as_slot():

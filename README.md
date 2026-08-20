@@ -29,6 +29,14 @@ game (pick 1-2 batters/day who you think will record a hit).
      as a "TBD" badge and called out in that pick's reasons) so the page
      still has something useful to look at before starters are set —
      just revisit closer to game time as real lineups and starters post.
+   - Each `Matchup` also carries `game_started` (from the schedule's
+     `abstractGameState`, live or final both count). Beat the Streak
+     only allows picking a player before their game begins, so
+     `rank.pick_top` never recommends one whose game has already
+     started — but the full ranked table (and the CLI's `--show` list)
+     still show them, tagged with a "GAME STARTED" badge, since seeing
+     the model's full output is useful for checking its work even for
+     matchups you can no longer act on.
 2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into 13
    signals: batting order slot, the opposing pitcher's career
    strikeouts-per-9 and career ERA (both entering this season) and

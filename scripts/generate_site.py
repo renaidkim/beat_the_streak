@@ -131,9 +131,11 @@ def _table_row(rank: int, pick: Pick) -> str:
     loc = "vs" if m.is_home else "@"
     reasons = "; ".join(pick.reasons) if pick.reasons else "—"
     tbd = "" if m.pitcher.confirmed else ' <span class="tbd-badge">TBD</span>'
+    started = ' <span class="started-badge">GAME STARTED</span>' if m.game_started else ""
+    row_cls = ' class="started"' if m.game_started else ""
     return (
-        f"<tr><td>{rank}</td>"
-        f"<td>{html.escape(m.batter.name)}</td>"
+        f"<tr{row_cls}><td>{rank}</td>"
+        f"<td>{html.escape(m.batter.name)}{started}</td>"
         f"<td>{pick.hit_probability:.1%}</td>"
         f"<td>{loc} {html.escape(m.pitcher.name)}{tbd}</td>"
         f"<td>{html.escape(reasons)}</td></tr>"
@@ -197,6 +199,11 @@ _PAGE_TEMPLATE = """<!doctype html>
     display: inline-block; font-size: 0.7rem; padding: 0.05rem 0.35rem; border-radius: 4px;
     background: var(--border); color: var(--muted); margin-left: 0.3rem;
   }}
+  .started-badge {{
+    display: inline-block; font-size: 0.7rem; padding: 0.05rem 0.35rem; border-radius: 4px;
+    background: #e57373; color: #fff; margin-left: 0.3rem;
+  }}
+  tr.started {{ opacity: 0.5; }}
 </style>
 </head>
 <body>
