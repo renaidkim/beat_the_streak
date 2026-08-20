@@ -34,20 +34,21 @@ def test_hitter_friendly_park_raises_probability():
     )
 
 
-def test_thin_recent_sample_is_shrunk_toward_season_avg():
-    # A 4-game hot streak shouldn't swing the estimate as much as the same
-    # rate sustained over a full 10-game window would.
-    thin_hot = make_matchup(
-        batter=make_batter(season_avg=0.230, season_avg_vs_lhp=0.230, season_avg_vs_rhp=0.230),
-        recent_form=make_recent_form([1] * 4),  # 4 games at 1.000
+def test_favorable_platoon_split_raises_probability():
+    # Batter hits well above his season average against this pitcher's
+    # throwing hand specifically.
+    pitcher = make_pitcher(throws="L")
+    favorable = make_matchup(
+        batter=make_batter(season_avg=0.250, season_avg_vs_lhp=0.320, season_avg_vs_rhp=0.250),
+        pitcher=pitcher,
     )
-    full_hot = make_matchup(
-        batter=make_batter(season_avg=0.230, season_avg_vs_lhp=0.230, season_avg_vs_rhp=0.230),
-        recent_form=make_recent_form([1] * 10),  # 10 games at 1.000
+    neutral = make_matchup(
+        batter=make_batter(season_avg=0.250, season_avg_vs_lhp=0.250, season_avg_vs_rhp=0.250),
+        pitcher=pitcher,
     )
     assert (
-        score_matchup(thin_hot).hit_probability
-        < score_matchup(full_hot).hit_probability
+        score_matchup(favorable).hit_probability
+        > score_matchup(neutral).hit_probability
     )
 
 

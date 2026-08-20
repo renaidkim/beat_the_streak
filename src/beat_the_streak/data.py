@@ -164,7 +164,8 @@ class MlbStatsApiSource(DataSource):
                     "personIds": ",".join(str(i) for i in chunk),
                     "hydrate": (
                         "currentTeam,"
-                        f"stats(group=[hitting],type=[season,lastXGames],limit={RECENT_FORM_WINDOW})"
+                        "stats(group=[hitting],type=[season,lastXGames,statSplits],"
+                        f"limit={RECENT_FORM_WINDOW},sitCodes=[vl,vr])"
                     ),
                 },
                 timeout=20,
@@ -173,6 +174,7 @@ class MlbStatsApiSource(DataSource):
             for person in resp.json().get("people", []):
                 season_stat = _stat_split(person, "season")
                 recent_stat = _stat_split(person, "lastXGames")
+                platoon_splits = _platoon_splits(person)
                 season_avg = float(season_stat.get("avg") or ".250")
                 batter = Batter(
                     id=str(person["id"]),
@@ -180,10 +182,11 @@ class MlbStatsApiSource(DataSource):
                     bats=person.get("batSide", {}).get("code", "R"),
                     team=person.get("currentTeam", {}).get("name", ""),
                     season_avg=season_avg,
-                    # No vs-pitcher-hand split endpoint wired up yet; fall
-                    # back to season average until that's added.
-                    season_avg_vs_lhp=season_avg,
-                    season_avg_vs_rhp=season_avg,
+                    # Falls back to season average when a split has too few
+                    # at-bats to report an avg (early season, part-time
+                    # platoon batter facing an unfamiliar hand, etc.).
+                    season_avg_vs_lhp=float(platoon_splits.get("vl", {}).get("avg") or season_avg),
+                    season_avg_vs_rhp=float(platoon_splits.get("vr", {}).get("avg") or season_avg),
                 )
                 recent_form = RecentForm(
                     games_played=int(recent_stat.get("gamesPlayed", 0)),
@@ -242,6 +245,21 @@ def _stat_split(person: dict[str, Any], type_display_name: str) -> dict[str, Any
             if splits:
                 return splits[0].get("stat", {})
     return {}
+
+
+def _platoon_splits(person: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """{"vl": stat, "vr": stat} for a person's statSplits stat group, keyed
+    by the split's own "vl"/"vr" code rather than list position.
+    """
+    result: dict[str, dict[str, Any]] = {}
+    for stat_group in person.get("stats", []):
+        if stat_group.get("type", {}).get("displayName") != "statSplits":
+            continue
+        for split in stat_group.get("splits", []):
+            code = split.get("split", {}).get("code")
+            if code in ("vl", "vr"):
+                result[code] = split.get("stat", {})
+    return result
 
 
 def _chunks(items: list[int], size: int) -> list[list[int]]:

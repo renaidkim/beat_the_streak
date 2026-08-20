@@ -20,22 +20,16 @@ game (pick 1-2 batters/day who you think will record a hit).
      tests, and demos (`data/sample_slate_2026-08-19.json`).
 2. **Features** (`beat_the_streak/features.py`) — turns a `Matchup` into a
    handful of signals: season average, last-10-games form, the platoon
-   (vs left/right) split, the opposing pitcher's average-against, park
-   factor, home/away.
-3. **Ranking** (`beat_the_streak/rank.py`) — blends those signals into a
-   per-at-bat hit probability, then converts to a per-game probability via
-   `1 - (1 - p)^at_bats` (the standard "at least one hit in N at-bats"
-   formula). Thin recent-game samples are shrunk toward season average so
-   one hot game doesn't dominate. Picking the top N also avoids selecting
+   split (average specifically vs. today's opposing pitcher hand), the
+   opposing pitcher's average-against, park factor, home/away.
+3. **Ranking** (`beat_the_streak/rank.py`) — a logistic regression, fit on
+   a real season of outcomes, predicts P(hit) directly from those signals.
+   See [Model backtest](#model-backtest) below for why it looks like this
+   and not like a hand-tuned formula. Picking the top N avoids selecting
    two batters who face the *same* pitcher, since their outcomes are
    correlated — one shutdown pitching performance sinks both picks at once.
 4. **CLI** (`beat_the_streak/cli.py`) — prints the ranked slate and the
    recommended picks.
-
-This is a transparent heuristic, not a fitted model — a deliberate starting
-point. Swapping `score_matchup` for a model trained on historical
-outcomes (logistic regression / gradient boosting over these same features)
-is the natural next step once there's a results log to train on.
 
 ## Park factor: does it actually matter?
 
@@ -70,6 +64,74 @@ each team's home vs. road slate happened to include) — good enough to
 weight a heuristic model, not research-grade. Re-run the script once or
 twice a season; park effects don't shift week to week.
 
+## Model backtest
+
+The original `rank.py` was a hand-tuned weighted blend (season avg 25%,
+recent form 35%, platoon 20%, pitcher quality 20%) converted to a
+per-game probability via `1 - (1-p)^4`. It was never checked against real
+outcomes. `scripts/fit_hit_probability_model.py` does that: it pulls a
+full season (2025) of game logs for the ~100 highest-plate-appearance
+batters and their opposing starters, reconstructs — for every game — only
+what would have been known *before* that game (season average to date,
+last-10-games form, platoon split to date, opposing starter's own
+season-to-date average-against, park factor, home/away; no lookahead),
+and scores every row two ways: with the shipped heuristic, and with a
+logistic regression fit on a date-based holdout (train on the first 70%
+of the season, evaluate on the rest, so nothing from "the future" leaks
+into training).
+
+**The heuristic failed the check.** On the held-out games:
+
+| Model | Log loss | Brier | AUC |
+| :--- | :--- | :--- | :--- |
+| Heuristic (as originally shipped) | 0.6580 | 0.2319 | 0.539 |
+| Baseline: always predict the training set's average hit rate | 0.6520 | 0.2297 | 0.500 |
+| Fitted logistic regression | 0.6502 | 0.2289 | 0.541 |
+
+The heuristic scored *worse* than a baseline that ignores every feature
+and just predicts the league-average hit rate every time. Its calibration
+table showed why: predicted probabilities ranged from 59% to 80% across
+deciles, but the *actual* hit rate in those same deciles barely moved
+(58% to 72%) and wasn't even monotonic. The heuristic was overconfident —
+it turned small, mostly-noisy differences between batters into large
+swings in predicted probability. That's the real, humbling finding here:
+whether a specific batter gets a hit in a specific game is close to a
+coin flip (raw correlation between any single feature and the outcome
+tops out around r=0.04); a season of team-average stats only weakly
+narrows that down, and the model has to say so honestly rather than
+projecting false confidence.
+
+A bootstrap check (30 resamples) on the fitted coefficients found only
+two features with a *consistent* sign across every resample: **park
+factor** and **platoon split** (as a delta from season average, not an
+absolute number — see the script's docstring for why the absolute version
+collapses onto season average and creates artificial collinearity).
+Season average, recent form, and pitcher quality all point the expected
+direction but are individually noisy at this sample size (~14k
+batter-games); they still add value combined, just don't over-trust any
+one of them alone.
+
+Two concrete changes came out of this and are now shipped:
+
+- **`rank.py` now runs the fitted logistic regression directly**
+  (coefficients in `data/hit_probability_model.json`, loaded at import
+  time — no runtime ML dependency, it's just `sigmoid(intercept +
+  Σ coef·feature)`), predicting the per-game probability directly instead
+  of a per-at-bat rate converted via the `1-(1-p)^4` formula. Live output
+  is visibly better-calibrated: predicted probabilities on a real slate
+  now span roughly 60-76% instead of 53-84%.
+- **Real platoon splits are now wired into `MlbStatsApiSource`** (batched
+  into the existing per-batter stats call via `sitCodes=[vl,vr]`, no
+  extra requests) instead of falling back to season average for both
+  hands. This was a documented known gap before; the backtest is what
+  justified prioritizing it — it's one of only two features the bootstrap
+  called reliable.
+
+Rerun `python scripts/fit_hit_probability_model.py` (needs
+`requirements-analysis.txt`: pandas/numpy/scikit-learn, offline-analysis
+only, not a runtime dependency) once or twice a season to refresh the
+coefficients against a more recent year.
+
 ## Performance
 
 `MlbStatsApiSource` batches instead of doing one request per batter:
@@ -95,15 +157,26 @@ beat-the-streak 2026-08-19 --source fixture \
 
 # Refresh the park-factor table (run once or twice a season):
 python scripts/refresh_park_factors.py
+
+# Refresh the hit-probability model against a more recent season
+# (needs requirements-analysis.txt):
+pip install -r requirements-analysis.txt
+python scripts/fit_hit_probability_model.py
 ```
 
 ## Known gaps
 
-- No real vs-pitcher-hand split endpoint is wired up yet for batters
-  (falls back to season average).
 - Park factors aren't split by batter handedness (some parks favor lefties
   or righties very differently — Yankee Stadium's short right field is
   the classic example).
+- The model was backtested on one season (2025) and ~14k batter-games
+  from the ~100 highest-plate-appearance hitters; it hasn't been
+  validated on part-time players, rookies with short track records, or a
+  second season. Season average and recent form individually had wide
+  bootstrap uncertainty (see [Model backtest](#model-backtest)) — the
+  fitted weights are a reasonable current estimate, not a settled result.
+- No accounting for a batter's own recent injury/rest status, or same-day
+  lineup changes after prediction time.
 
 ## Tests
 

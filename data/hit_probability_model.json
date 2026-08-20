@@ -1,0 +1,33 @@
+{
+  "features": [
+    "season_avg_to_date",
+    "recent_form_avg",
+    "platoon_delta",
+    "pitcher_oba_against",
+    "park_factor",
+    "is_home"
+  ],
+  "coefficients": {
+    "season_avg_to_date": 0.8729549366605239,
+    "recent_form_avg": 0.18198019181771044,
+    "platoon_delta": 0.7678336936635541,
+    "pitcher_oba_against": 0.49937598105542147,
+    "park_factor": 1.4193743362483222,
+    "is_home": 0.020270441201898613
+  },
+  "intercept": -1.2239077901622442,
+  "metadata": {
+    "season": 2025,
+    "n_rows": 14331,
+    "n_batters": 100,
+    "date_range": [
+      "2025-03-28",
+      "2025-09-28"
+    ],
+    "holdout_metrics_at_fit_time": {
+      "log_loss": 0.6495506838550331,
+      "brier": 0.22858957256038015,
+      "auc": 0.5412051478980562
+    }
+  }
+}

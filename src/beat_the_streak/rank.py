@@ -1,76 +1,82 @@
 """Score matchups by estimated probability of getting a hit that game, and
 pick the best options for a Beat the Streak entry.
 
-The estimate has two stages:
+The model is a logistic regression fit directly on real 2025-season
+outcomes (see scripts/fit_hit_probability_model.py and the README's
+"Model backtest" section) predicting P(batter gets >=1 hit in this game)
+from: season average to date, last-10-games form, platoon delta (average
+vs. today's opposing pitcher hand, minus season average), the opposing
+pitcher's own season-to-date average-against, park factor, and home/away.
+Coefficients live in data/hit_probability_model.json, refreshed by that
+script the same way data/park_factors.json is.
 
-1. Blend season average, recent form, the platoon (vs-hand) split, and the
-   opposing pitcher's average-against into a single per-at-bat hit
-   probability, then adjust for park.
-2. Convert that per-at-bat probability into a per-game probability using
-   the standard "at least one hit in N at-bats" formula:
-   P(hit in game) = 1 - (1 - p_per_ab) ** expected_at_bats.
-
-This is a transparent heuristic, not a fitted model. It's a reasonable
-starting point and a natural place to later swap in a model trained on
-historical outcomes without touching the rest of the pipeline.
+This replaced an earlier hand-tuned weighted-blend heuristic after
+backtesting showed that heuristic was overconfident enough to score worse
+than a naive "always predict the league average" baseline on proper
+scoring rules (log loss, Brier), despite ranking picks in roughly the
+right order (AUC modestly above chance). The fitted model is both better
+calibrated and simpler: it predicts the per-game probability directly,
+with no need for a separate per-at-bat-to-per-game conversion step.
 """
 
 from __future__ import annotations
 
+import json
+import math
 from dataclasses import dataclass
+from pathlib import Path
 
 from .features import LEAGUE_AVG_AVG, BatterFeatures, build_features
 from .models import Matchup, Pick
 
-EXPECTED_AT_BATS_PER_GAME = 4.0
-MIN_RECENT_GAMES_FOR_FULL_WEIGHT = 5
+MODEL_PATH = Path(__file__).resolve().parents[2] / "data" / "hit_probability_model.json"
 
-WEIGHTS = {
-    "recent_form": 0.35,
-    "season_avg": 0.25,
-    "platoon": 0.20,
-    "pitcher": 0.20,
-}
+# Safety bounds on the final probability: a linear model can extrapolate
+# poorly for combinations of features more extreme than anything in the
+# training data (e.g. a career year at Coors Field against a rookie's
+# worst possible matchup). Sigmoid already bounds to (0, 1); this keeps
+# the output within a range that's plausible for a single game.
+MIN_HIT_PROB = 0.05
+MAX_HIT_PROB = 0.95
 
-# Per-at-bat probability floor/ceiling to keep the game-level estimate sane
-# even with small samples or unusual inputs.
-MIN_PER_AB_PROB = 0.05
-MAX_PER_AB_PROB = 0.45
+
+def _load_model() -> dict:
+    raw = json.loads(MODEL_PATH.read_text())
+    return raw
+
+
+_MODEL = _load_model()
+_FEATURES: list[str] = _MODEL["features"]
+_COEFFICIENTS: dict[str, float] = _MODEL["coefficients"]
+_INTERCEPT: float = _MODEL["intercept"]
 
 
 def score_matchup(matchup: Matchup) -> Pick:
     features = build_features(matchup)
-    per_ab_prob, reasons = _per_ab_hit_probability(features)
-    per_ab_prob *= features.park_factor
-    per_ab_prob = min(max(per_ab_prob, MIN_PER_AB_PROB), MAX_PER_AB_PROB)
+    platoon_delta = features.platoon_avg - features.season_avg
 
-    if features.park_factor >= 1.05:
-        reasons.append(f"hitter-friendly park (factor {features.park_factor:.2f})")
-    elif features.park_factor <= 0.95:
-        reasons.append(f"pitcher-friendly park (factor {features.park_factor:.2f})")
+    row = {
+        "season_avg_to_date": features.season_avg,
+        "recent_form_avg": features.recent_form_avg,
+        "platoon_delta": platoon_delta,
+        "pitcher_oba_against": features.pitcher_oba_against,
+        "park_factor": features.park_factor,
+        "is_home": 1.0 if features.is_home else 0.0,
+    }
+    linear = _INTERCEPT + sum(_COEFFICIENTS[name] * row[name] for name in _FEATURES)
+    hit_probability = 1.0 / (1.0 + math.exp(-linear))
+    hit_probability = min(max(hit_probability, MIN_HIT_PROB), MAX_HIT_PROB)
 
-    game_prob = 1 - (1 - per_ab_prob) ** EXPECTED_AT_BATS_PER_GAME
-    return Pick(matchup=matchup, hit_probability=game_prob, reasons=reasons)
+    reasons = _explain(features, platoon_delta)
+    return Pick(matchup=matchup, hit_probability=hit_probability, reasons=reasons)
 
 
-def _per_ab_hit_probability(features: BatterFeatures) -> tuple[float, list[str]]:
+def _explain(features: BatterFeatures, platoon_delta: float) -> list[str]:
+    """Human-readable reasons behind the score. Purely descriptive -- these
+    thresholds don't feed the model, they just surface which signals stand
+    out for this matchup.
+    """
     reasons: list[str] = []
-    weights = dict(WEIGHTS)
-
-    # Down-weight recent form when the sample is thin (early season, call-up,
-    # etc.) and redistribute that weight onto season average.
-    if features.games_of_recent_data < MIN_RECENT_GAMES_FOR_FULL_WEIGHT:
-        shrink = features.games_of_recent_data / MIN_RECENT_GAMES_FOR_FULL_WEIGHT
-        recovered = weights["recent_form"] * (1 - shrink)
-        weights["recent_form"] *= shrink
-        weights["season_avg"] += recovered
-
-    per_ab_prob = (
-        weights["recent_form"] * features.recent_form_avg
-        + weights["season_avg"] * features.season_avg
-        + weights["platoon"] * features.platoon_avg
-        + weights["pitcher"] * features.pitcher_oba_against
-    )
 
     if features.recent_form_avg - features.season_avg >= 0.040:
         reasons.append(
@@ -83,15 +89,22 @@ def _per_ab_hit_probability(features: BatterFeatures) -> tuple[float, list[str]]
             f"last {features.games_of_recent_data})"
         )
 
-    if features.platoon_avg - features.season_avg >= 0.020:
-        reasons.append(f"favorable platoon split (.{round(features.platoon_avg * 1000):03d})")
+    if platoon_delta >= 0.020:
+        reasons.append(f"favorable platoon split ({platoon_delta:+.3f} vs. season avg)")
+    elif platoon_delta <= -0.020:
+        reasons.append(f"unfavorable platoon split ({platoon_delta:+.3f} vs. season avg)")
 
     if features.pitcher_oba_against - LEAGUE_AVG_AVG >= 0.015:
         reasons.append(f"contact-prone pitcher (.{round(features.pitcher_oba_against * 1000):03d} against)")
     elif LEAGUE_AVG_AVG - features.pitcher_oba_against >= 0.015:
         reasons.append(f"tough pitcher (.{round(features.pitcher_oba_against * 1000):03d} against)")
 
-    return per_ab_prob, reasons
+    if features.park_factor >= 1.05:
+        reasons.append(f"hitter-friendly park (factor {features.park_factor:.2f})")
+    elif features.park_factor <= 0.95:
+        reasons.append(f"pitcher-friendly park (factor {features.park_factor:.2f})")
+
+    return reasons
 
 
 def rank_matchups(matchups: list[Matchup]) -> list[Pick]:
