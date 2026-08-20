@@ -330,6 +330,21 @@ positive correlation from same-pitcher pairs helping some, per
 If you're comparing against a single-pick tool, the top-daily-pick row
 (77.7%) is the fairer comparison.
 
+**Recent form, re-tested a third time:** round one's finding that
+last-10-games form adds nothing was from a single 2025-only logistic
+regression run. `scripts/test_recent_form.py` re-tests it properly —
+same multi-season/true-2026-holdout methodology as the shipped model,
+four window definitions (5 games, 10 games, 5 calendar days, 10 calendar
+days, each as a delta vs. season-to-date average, each added with a
+positive monotonic constraint so a real effect couldn't be suppressed by
+the wrong sign) — and the answer holds: all four came back at ~zero
+permutation importance (-0.00002 to -0.00011) and every one made holdout
+log loss very slightly worse, not better, than the shipped model without
+any recent-form feature. A handful of recent games is a small, high-
+variance sample; career average already captures the player's true
+talent level far more reliably, so "hot streaks" mostly look like noise
+once that's controlled for.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes

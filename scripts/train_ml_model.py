@@ -242,6 +242,10 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
             vs_hand_ab = {"L": 0, "R": 0}
             vs_hand_hits = {"L": 0, "R": 0}
             prev_batter_date: str | None = None
+            # (date, at_bats, hits) for every prior game this season, in
+            # order -- used to compute recent-form windows below without
+            # any extra API calls (gameLog data is already fetched).
+            prior_games: list[tuple[str, int, int]] = []
 
             for r in rows:
                 pid = schedule_map.get((r["date"], r["team_id"]))
@@ -278,6 +282,30 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                         )
                         month = int(r["date"][5:7])
 
+                        def _window_avg(games: list[tuple[str, int, int]]) -> float:
+                            wab = sum(g[1] for g in games)
+                            whits = sum(g[2] for g in games)
+                            return whits / wab if wab > 0 else season_avg_to_date
+
+                        cur_date = datetime.date.fromisoformat(r["date"])
+                        last_5g = _window_avg(prior_games[-5:])
+                        last_10g = _window_avg(prior_games[-10:])
+                        last_5d = _window_avg(
+                            [g for g in prior_games if (cur_date - datetime.date.fromisoformat(g[0])).days <= 5]
+                        )
+                        last_10d = _window_avg(
+                            [g for g in prior_games if (cur_date - datetime.date.fromisoformat(g[0])).days <= 10]
+                        )
+                        # Deltas vs. season-to-date average, same
+                        # reparametrization platoon_delta already uses --
+                        # the raw absolute version collapses onto
+                        # season/career average and creates artificial
+                        # collinearity, per round one's finding.
+                        recent_form_5g_delta = last_5g - season_avg_to_date
+                        recent_form_10g_delta = last_10g - season_avg_to_date
+                        recent_form_5d_delta = last_5d - season_avg_to_date
+                        recent_form_10d_delta = last_10d - season_avg_to_date
+
                         out_rows.append(
                             {
                                 "season": season,
@@ -306,6 +334,10 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                                 "is_home": int(r["is_home"]),
                                 "batting_order": float(slot),
                                 "month": month,
+                                "recent_form_5g_delta": recent_form_5g_delta,
+                                "recent_form_10g_delta": recent_form_10g_delta,
+                                "recent_form_5d_delta": recent_form_5d_delta,
+                                "recent_form_10d_delta": recent_form_10d_delta,
                                 # kept for scoring the shipped production model too
                                 "season_avg_to_date": season_avg_to_date,
                                 "got_hit": int(r["hits"] > 0),
@@ -318,6 +350,7 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                     vs_hand_ab[hand] += r["at_bats"]
                     vs_hand_hits[hand] += r["hits"]
                 prev_batter_date = r["date"]
+                prior_games.append((r["date"], r["at_bats"], r["hits"]))
 
     df = pd.DataFrame(out_rows)
     df["date"] = pd.to_datetime(df["date"])
