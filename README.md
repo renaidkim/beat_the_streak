@@ -414,6 +414,21 @@ Not implemented. Worth remembering as a general lesson: a feature that
 looks good on an admittedly-flawed proxy needs to survive the properly-
 built version before it ships, not just the first version that compiles.
 
+**Post-hoc probability calibration, tested and not worth it:**
+`scripts/test_calibration.py` wraps the shipped model in
+`CalibratedClassifierCV` (isotonic and Platt/sigmoid, both fit via
+5-fold cross-validation on training data only, never touching the 2026
+test set). Calibration is a monotonic transform, so it can't change
+rankings (AUC), only how well the predicted numbers themselves match
+reality. Isotonic came back essentially a wash (log loss 0.6467 vs.
+0.6468 uncalibrated, bootstrap 95% CI [-0.00083, +0.00068] -- a coin
+flip). Sigmoid/Platt was clearly worse (0.6487, CI entirely on the
+"worse" side, only 1% of bootstrap draws favoring it) -- it assumes a
+specific S-shaped miscalibration that doesn't match this model's actual
+output. Makes sense in hindsight: `HistGradientBoostingClassifier`
+already directly optimizes log loss during training, so there isn't
+much miscalibration left to fix. Not implemented.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes
