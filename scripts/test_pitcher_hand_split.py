@@ -28,6 +28,26 @@ Tests the raw delta, several shrinkage strengths (this is a fractional
 feature with small-sample potential exactly like every other rate
 feature audited this session), and reports permutation importance +
 bootstrap vs. the shipped model.
+
+RESULT: rejected. Every shrinkage strength tested (None, C=10/25/50/100)
+underperformed the shipped model -- best was C=50 at 34.4% of a
+2000-draw bootstrap favoring, still well below break-even, and the
+fraction-favoring didn't move monotonically with C (0.118, 0.216,
+0.163, 0.344, 0.179) -- the signature of shrinking toward a real
+relationship is a clean gradient as C increases; this bouncing around
+is what shrinking noise toward zero looks like instead. Consistent with
+a well-known sabermetric finding: pitcher-specific platoon splits are
+extremely noisy at the individual level and need enormous sample sizes
+(triple digits of PA against the less-common-for-that-pitcher hand,
+often more than a full early-to-mid career provides) before they
+separate from noise -- serious projection systems heavily regress
+individual pitcher platoon splits toward the league-average platoon
+effect for exactly this reason. The league-average version of this
+effect is arguably already captured by bats_L/pitcher_throws_L
+(same-hand vs. opposite-hand, at least directionally); what this
+feature tried to add -- *this specific pitcher's* deviation from that
+average -- just isn't reliably measurable from the sample sizes
+available here.
 """
 
 from __future__ import annotations

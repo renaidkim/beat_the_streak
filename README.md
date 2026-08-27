@@ -668,6 +668,61 @@ kept in sync by comment) -- verified monotonic by point-check across
 three feature contexts before shipping, same discipline as every prior
 change to this model.
 
+### Round seven: pitcher-vs-batter-hand splits -- unblocked, then rejected on the data
+
+Earlier round four noted this idea as blocked: MLB Stats API's
+`sitCodes` (the `vl`/`vr` platoon filter) is silently ignored by
+`stats=byDateRange` and `stats=yearByYear`, the endpoints used
+everywhere else in this pipeline for career stats. Revisited that
+assumption rather than taking the earlier "blocked" note at face value
+-- `stats=statSplits` (a different stat type) *does* honor `sitCodes`,
+but only with an explicit `season=` parameter, meaning one API call per
+(pitcher, season) instead of one call per pitcher for full career.
+Fetched exactly the season list each pitcher actually has real data for
+(reusing the season list already known from the yearByYear career
+fetch, no wasted calls) -- 584 pitchers, 3,540 (pitcher, season) pairs
+total -- and manually summed each season's vs-L/vs-R counts into a
+point-in-time "entering season Y" split, same architecture as every
+other career stat here.
+
+`scripts/test_pitcher_hand_split.py` built the feature as a delta (this
+pitcher's career OBA against the batter's *effective* handedness --
+switch hitters resolved to the side they'd actually bat against this
+specific pitcher -- minus his own overall career OBA), following the
+same delta-not-absolute reasoning as `platoon_delta` and the
+`recent_form_*_delta` features. Tested against the shipped model with
+several shrinkage strengths, since this is exactly the kind of
+small-sample-prone fractional feature audited elsewhere in this
+project:
+
+| Shrinkage | Bootstrap favoring |
+| :--- | :--- |
+| none (raw) | 11.8% |
+| C=10 | 21.6% |
+| C=25 | 16.3% |
+| C=50 | 34.4% |
+| C=100 | 17.9% |
+
+Every strength underperformed, and not shipped. Also notable: the
+fraction-favoring didn't move in a clean gradient as shrinkage
+increased -- a real relationship being progressively de-noised by
+stronger shrinkage looks like a smooth curve (as `pitcher_oba_against`/
+`career_avg`/`career_obp` showed in round five); this bounced around
+with no C standing out as clearly right. That pattern is consistent
+with shrinking pure noise toward zero rather than shrinking a real
+signal toward a trustworthy estimate. It also matches a known
+sabermetric finding: pitcher-specific platoon splits are notoriously
+noisy at the individual level and require very large opposite-hand
+sample sizes (more innings than most pitchers accumulate against their
+less-common-for-them hand in several years, let alone a single
+point-in-time career slice) before they separate from noise -- real
+projection systems heavily regress individual pitcher platoon splits
+toward the league-average platoon effect for this exact reason. The
+league-average version of the effect (same-hand disadvantage) is
+already available to the model directionally through `bats_L`/
+`pitcher_throws_L`; this specific pitcher's deviation from that average
+just isn't reliably measurable from the sample available here.
+
 ## Why same-pitcher picks aren't avoided
 
 `pick_top` used to skip a pick if it shared an opposing pitcher with one
@@ -803,7 +858,18 @@ python scripts/generate_site.py --days 3 --out _site
   pickle-compatibility shims.
 - Park factors aren't split by batter handedness (some parks favor lefties
   or righties very differently — Yankee Stadium's short right field is
-  the classic example).
+  the classic example). Not attempted: the current park-factor
+  methodology only tracks team-level home/away splits for a team's
+  hitters as a whole; a handedness-specific version would need pulling
+  *every* hitter (not just the current top-100-PA-per-season subset used
+  elsewhere) with handedness tags across all 3+ backtest seasons per
+  team, a materially larger data pull than anything else in this
+  project for a park effect that's already fairly small (see "Park
+  factor: does it actually matter?" above) — the pitcher-side version of
+  this same idea (round seven, a pitcher's split by *this specific
+  batter's* hand rather than a park's split by batter hand) was tried
+  and rejected on real data, which raises the bar for thinking the park
+  version would fare better with several times the fetch cost.
 - The model is backtested on the ~100 highest-plate-appearance hitters
   per season; it hasn't been validated on part-time players or true
   rookies specifically — `build_dataset` in `train_ml_model.py` actually
