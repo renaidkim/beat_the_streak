@@ -118,6 +118,7 @@ def batter_career_rates(splits: list[dict], season_year: int) -> dict | None:
     return {
         "avg": avg, "obp": obp, "slg": slg, "iso": slg - avg, "babip": babip,
         "bb_rate": bb / pa if pa > 0 else 0.0, "k_rate": so / pa if pa > 0 else 0.0,
+        "ab": ab, "pa": pa,
     }
 
 
@@ -150,6 +151,7 @@ def pitcher_career_rates(splits: list[dict], season_year: int) -> dict | None:
     return {
         "era": er * 27 / outs, "whip": (bb + hits) / innings,
         "k9": k * 27 / outs, "bb9": bb * 27 / outs, "hr9": hr * 27 / outs,
+        "outs": outs,
     }
 
 
@@ -267,14 +269,14 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                 key=lambda r: r[0],
             )
 
-        def pitcher_oba_to_date(pid: int, date: str) -> float | None:
+        def pitcher_oba_to_date(pid: int, date: str) -> tuple[float, int] | None:
             ab = hits = 0
             for d, a, h in pitcher_games.get(pid, []):
                 if d >= date:
                     break
                 ab += a
                 hits += h
-            return hits / ab if ab > 0 else None
+            return (hits / ab, ab) if ab > 0 else None
 
         def pitcher_rest_days(pid: int, date: str) -> float:
             prior_dates = [d for d, _, _ in pitcher_games.get(pid, []) if d < date]
@@ -322,9 +324,10 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                 hand = pitcher_hand.get(pid) if pid else None
 
                 if cum_ab > 0 and pid is not None:
-                    poba = pitcher_oba_to_date(pid, r["date"])
+                    poba_result = pitcher_oba_to_date(pid, r["date"])
                     pcareer = pitcher_career_rates(pitcher_career.get(pid, []), season)
-                    if poba is not None and pcareer is not None and bage is not None:
+                    if poba_result is not None and pcareer is not None and bage is not None:
+                        poba, poba_ab = poba_result
                         season_avg_to_date = cum_hits / cum_ab
                         platoon_ab = vs_hand_ab.get(hand, 0)
                         platoon_avg = (
@@ -402,6 +405,12 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                                 "pitcher_hr9_career": pcareer["hr9"],
                                 "pitcher_oba_against": poba,
                                 "pitcher_throws_L": 1.0 if hand == "L" else 0.0,
+                                # Sample-size diagnostics (not model features) --
+                                # see scripts/test_sample_size_audit.py.
+                                "pitcher_oba_ab": poba_ab,
+                                "career_avg_ab": bcareer["ab"],
+                                "career_rate_pa": bcareer["pa"],
+                                "pitcher_career_outs": pcareer["outs"],
                                 "rest_days_pitcher": pitcher_rest_days(pid, r["date"]),
                                 "park_factor": pf,
                                 "is_home": int(r["is_home"]),
