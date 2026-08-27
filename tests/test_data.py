@@ -6,6 +6,7 @@ from beat_the_streak.data import (
     _career_pitching_rates_entering_season,
     _game_has_started,
     _placeholder_pitcher,
+    _shrink_toward,
 )
 from beat_the_streak.features import LEAGUE_AVG_AVG
 
@@ -85,6 +86,23 @@ def test_career_pitching_rates_none_when_no_prior_seasons():
         ]
     }
     assert _career_pitching_rates_entering_season(person, 2025) is None
+
+
+def test_shrink_toward_pulls_small_samples_close_to_prior():
+    # n much smaller than c -- result should sit close to the prior,
+    # not the raw value.
+    result = _shrink_toward(raw=1.000, n=2, prior=0.250, c=25)
+    assert abs(result - 0.250) < 0.06
+
+
+def test_shrink_toward_trusts_large_samples():
+    # n much larger than c -- result should sit close to the raw value.
+    result = _shrink_toward(raw=0.300, n=5000, prior=0.245, c=25)
+    assert abs(result - 0.300) < 0.005
+
+
+def test_shrink_toward_zero_n_returns_prior_exactly():
+    assert _shrink_toward(raw=0.900, n=0, prior=0.245, c=25) == 0.245
 
 
 def test_game_has_started_false_for_preview():

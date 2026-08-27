@@ -44,8 +44,21 @@ from beat_the_streak.models import Batter, Matchup, Pitcher  # noqa: E402
 from beat_the_streak.rank import score_matchup  # noqa: E402
 
 LEAGUE_AVG_AVG = 0.245
+LEAGUE_AVG_OBP = 0.320
 MODEL_OUT_JSON = REPO_ROOT / "data" / "hit_probability_model_v2.json"
 MODEL_OUT_PKL = REPO_ROOT / "data" / "hit_probability_model_v2.pkl"
+
+# Empirical-Bayes shrinkage toward league average, weighted by each
+# feature's own underlying sample size (shrunk = raw*w + league_avg*(1-w),
+# w = n/(n+C)) -- follow-up to the bvp_delta sample-size fix
+# (scripts/test_sample_size_audit.py). Only these three showed a real,
+# validated improvement; career_k_rate/bb_rate and pitcher_era_career/
+# k9_career were tested the same way and shrinkage measurably HURT them
+# (the tree model was already handling their small-sample tail better
+# on its own) -- left raw, deliberately, not an oversight.
+SHRINK_C_PITCHER_OBA = 25   # sample size: batters faced this season so far
+SHRINK_C_CAREER_AVG = 600   # sample size: career at-bats entering this season
+SHRINK_C_CAREER_OBP = 100   # sample size: career at-bats entering this season
 
 # Full broad set tried first (see the run this replaced, recorded in
 # git history and the README): 24 features across career slash line,
@@ -327,7 +340,9 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                     poba_result = pitcher_oba_to_date(pid, r["date"])
                     pcareer = pitcher_career_rates(pitcher_career.get(pid, []), season)
                     if poba_result is not None and pcareer is not None and bage is not None:
-                        poba, poba_ab = poba_result
+                        poba_raw, poba_ab = poba_result
+                        poba_w = poba_ab / (poba_ab + SHRINK_C_PITCHER_OBA)
+                        poba = poba_raw * poba_w + LEAGUE_AVG_AVG * (1 - poba_w)
                         season_avg_to_date = cum_hits / cum_ab
                         platoon_ab = vs_hand_ab.get(hand, 0)
                         platoon_avg = (
@@ -379,6 +394,11 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                         recent_form_5d_delta = last_5d - season_avg_to_date
                         recent_form_10d_delta = last_10d - season_avg_to_date
 
+                        avg_w = bcareer["ab"] / (bcareer["ab"] + SHRINK_C_CAREER_AVG)
+                        career_avg_shrunk = bcareer["avg"] * avg_w + LEAGUE_AVG_AVG * (1 - avg_w)
+                        obp_w = bcareer["ab"] / (bcareer["ab"] + SHRINK_C_CAREER_OBP)
+                        career_obp_shrunk = bcareer["obp"] * obp_w + LEAGUE_AVG_OBP * (1 - obp_w)
+
                         out_rows.append(
                             {
                                 "season": season,
@@ -386,8 +406,15 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
                                 "batter_id": bid,
                                 "pitcher_id": pid,
                                 "opponent_team_id": r["opponent_team_id"],
-                                "career_avg": bcareer["avg"],
-                                "career_obp": bcareer["obp"],
+                                "career_avg": career_avg_shrunk,
+                                "career_obp": career_obp_shrunk,
+                                # Raw (unshrunk) versions, kept only so
+                                # score_shipped_model can reconstruct the
+                                # *prior* production model's real inputs --
+                                # that model was trained on raw values, not
+                                # these new shrunk ones.
+                                "career_avg_raw": bcareer["avg"],
+                                "pitcher_oba_against_raw": poba_raw,
                                 "career_slg": bcareer["slg"],
                                 "career_iso": bcareer["iso"],
                                 "career_babip": bcareer["babip"],
@@ -483,13 +510,13 @@ def report(name: str, y_true, y_pred) -> dict:
 def score_shipped_model(row: pd.Series) -> float:
     batter = Batter(
         id="x", name="x", bats="R", team="x",
-        career_avg=row["career_avg"],
+        career_avg=row["career_avg_raw"],
         season_avg=row["season_avg_to_date"],
         season_avg_vs_lhp=row["season_avg_to_date"] + row["platoon_delta"],
         season_avg_vs_rhp=row["season_avg_to_date"] + row["platoon_delta"],
     )
     pitcher = Pitcher(
-        id="y", name="y", throws="R", era=4.0, oba_against=row["pitcher_oba_against"]
+        id="y", name="y", throws="R", era=4.0, oba_against=row["pitcher_oba_against_raw"]
     )
     matchup = Matchup(
         batter=batter, pitcher=pitcher, is_home=bool(row["is_home"]),

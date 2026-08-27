@@ -59,6 +59,16 @@ LEAGUE_AVG_BB_RATE = 0.08
 # the empirical justification). Keep these two in sync.
 MIN_BVP_AB = 3
 
+# Empirical-Bayes shrinkage toward league average, weighted by each
+# feature's own sample size -- matches scripts/train_ml_model.py's
+# SHRINK_C_* constants, the values the shipped model was actually
+# trained with (see that file's comment for the empirical justification
+# and scripts/test_sample_size_audit.py for the full results). Keep
+# these in sync with train_ml_model.py.
+SHRINK_C_PITCHER_OBA = 25
+SHRINK_C_CAREER_AVG = 600
+SHRINK_C_CAREER_OBP = 100
+
 # How many ids to pack into one batched /people request. The API accepted
 # 80 comma-separated ids without complaint in testing; 50 leaves headroom.
 PEOPLE_BATCH_SIZE = 50
@@ -291,19 +301,31 @@ class MlbStatsApiSource(DataSource):
                     if birth_date
                     else 27.0
                 )
+                # Empirical-Bayes shrinkage toward league average, same
+                # correction the shipped model was trained with (see
+                # SHRINK_C_* above) -- a batter with only a handful of
+                # career at-bats shouldn't have that tiny sample taken
+                # at face value.
+                if career:
+                    career_avg = _shrink_toward(career["avg"], career["ab"], LEAGUE_AVG_AVG, SHRINK_C_CAREER_AVG)
+                    career_obp = _shrink_toward(career["obp"], career["ab"], LEAGUE_AVG_OBP, SHRINK_C_CAREER_OBP)
+                else:
+                    career_avg = season_avg
+                    career_obp = float(season_stat.get("obp") or LEAGUE_AVG_OBP)
+
                 result[person["id"]] = Batter(
                     id=str(person["id"]),
                     name=person["fullName"],
                     bats=person.get("batSide", {}).get("code", "R"),
                     team=person.get("currentTeam", {}).get("name", ""),
-                    career_avg=career["avg"] if career else season_avg,
+                    career_avg=career_avg,
                     season_avg=season_avg,
                     # Falls back to season average when a split has too few
                     # at-bats to report an avg (early season, part-time
                     # platoon batter facing an unfamiliar hand, etc.).
                     season_avg_vs_lhp=float(platoon_splits.get("vl", {}).get("avg") or season_avg),
                     season_avg_vs_rhp=float(platoon_splits.get("vr", {}).get("avg") or season_avg),
-                    career_obp=career["obp"] if career else float(season_stat.get("obp") or LEAGUE_AVG_OBP),
+                    career_obp=career_obp,
                     career_k_rate=career["k_rate"] if career else LEAGUE_AVG_K_RATE,
                     career_bb_rate=career["bb_rate"] if career else LEAGUE_AVG_BB_RATE,
                     age=age,
@@ -326,12 +348,19 @@ class MlbStatsApiSource(DataSource):
                 stat = _stat_split(person, "season")
                 season_era = float(stat.get("era") or 4.50)
                 career = _career_pitching_rates_entering_season(person, season_year)
+                # Empirical-Bayes shrinkage toward league average -- a
+                # pitcher's season-to-date average-against can be based
+                # on as few as a handful of batters faced early in the
+                # year (see SHRINK_C_PITCHER_OBA above).
+                oba_raw = float(stat.get("avg") or ".250")
+                oba_ab = int(stat.get("atBats", 0))
+                oba_against = _shrink_toward(oba_raw, oba_ab, LEAGUE_AVG_AVG, SHRINK_C_PITCHER_OBA)
                 result[person["id"]] = Pitcher(
                     id=str(person["id"]),
                     name=person["fullName"],
                     throws=person.get("pitchHand", {}).get("code", "R"),
                     era=season_era,
-                    oba_against=float(stat.get("avg") or ".250"),
+                    oba_against=oba_against,
                     era_career=career["era"] if career else season_era,
                     k9_career=(
                         career["k9"]
@@ -367,6 +396,16 @@ def _game_has_started(game: dict[str, Any]) -> bool:
     unselectable; only the not-yet-started distinction matters here.
     """
     return game.get("status", {}).get("abstractGameState") != "Preview"
+
+
+def _shrink_toward(raw: float, n: int, prior: float, c: float) -> float:
+    """Empirical-Bayes shrinkage: blend a raw rate toward a prior value,
+    weighted by how much sample (n) backs the raw rate. w = n/(n+c), so
+    w -> 0 (all prior) as n -> 0, and w -> 1 (all raw) as n grows past c.
+    See SHRINK_C_* above for which features use this and why.
+    """
+    w = n / (n + c)
+    return raw * w + prior * (1 - w)
 
 
 def _stat_split(person: dict[str, Any], type_display_name: str) -> dict[str, Any]:
@@ -429,6 +468,7 @@ def _career_hitting_rates_entering_season(
         "obp": (hits + bb + hbp) / obp_den if obp_den > 0 else avg,
         "k_rate": so / pa if pa > 0 else LEAGUE_AVG_K_RATE,
         "bb_rate": bb / pa if pa > 0 else LEAGUE_AVG_BB_RATE,
+        "ab": ab,
     }
 
 

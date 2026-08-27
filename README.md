@@ -521,6 +521,43 @@ time. The reason text also now spells out the actual at-bat count
 ("has hit this pitcher well in 11 career at-bats...") instead of saying
 "historically," which even 3-9 at-bats doesn't really support.
 
+### Round five: the same sample-size question, asked of every fractional feature
+
+`bvp_delta` wasn't the only feature computed from a variable-size
+sample -- most of the model's features are fractions with a real
+denominator behind them. Audited every one:
+`park_factor` (a precomputed multi-year aggregate across an entire
+park, thousands of games -- safe by construction) and `batting_order`/
+`bats_L`/`pitcher_throws_L`/`batter_age` (not rate features at all)
+were ruled out immediately. Everything else was tested the same way as
+`bvp_delta` -- `scripts/test_sample_size_audit.py`, empirical-Bayes
+shrinkage toward league average (`raw*w + league_avg*(1-w)`,
+`w = n/(n+C)`) swapped in for the raw feature, compared on the true
+2026 holdout:
+
+| Feature | Sample size | Result |
+| :--- | :--- | :--- |
+| `pitcher_oba_against` (season-to-date, as few as 3 batters faced early in a season) | at-bats faced | **Helped** -- C=25, 77% bootstrap favoring |
+| `career_obp` | career at-bats (min 55) | **Helped** -- C=100, 81% bootstrap favoring |
+| `career_avg` | career at-bats (min 55) | **Helped** -- C=600, 69% bootstrap favoring |
+| `career_k_rate`, `career_bb_rate` | career plate appearances | **Hurt** at every strength tried |
+| `pitcher_era_career`, `pitcher_k9_career` | career outs (min 18, i.e. 6 innings) | **Hurt** at every strength tried, with real confidence (bootstrap CI entirely on the "worse" side at higher C) |
+
+Not a uniform "small samples are always bad" story: the batting-average-
+family features (`pitcher_oba_against`, `career_avg`, `career_obp`) all
+benefited from being pulled toward league average when the underlying
+sample was thin, but the same correction applied to the career strikeout/
+walk-rate and pitcher-quality features made the model measurably *worse*
+-- the tree model was already handling those features' small-sample tail
+better on its own, and smoothing them out just destroyed real signal.
+Combined effect of the three winning corrections together, bootstrapped
+against the fully-raw version: log loss 0.6468 -> 0.6467, 67% of a
+2000-draw bootstrap favoring the shrunk version. Promoted into both the
+training pipeline and live serving (`data._shrink_toward`, `data.SHRINK_C_*`,
+kept in sync with `train_ml_model.py`'s constants by comment) -- verified
+monotonic by point-check before shipping, same discipline as every prior
+change to this model.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes

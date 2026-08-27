@@ -27,30 +27,30 @@
     "n_test_rows": 10240,
     "candidate_comparison": {
       "logreg": {
-        "log_loss": 0.6482621308109721,
-        "brier": 0.22792458278852662,
-        "auc": 0.5351948544692925
+        "log_loss": 0.6480586202097944,
+        "brier": 0.22783099721123565,
+        "auc": 0.5369127141360373
       },
       "random_forest": {
-        "log_loss": 0.6464617420721093,
-        "brier": 0.22710232703181177,
-        "auc": 0.5460044463477971
+        "log_loss": 0.6463191237065409,
+        "brier": 0.22704085502248503,
+        "auc": 0.5468203378521352
       },
       "gbm": {
-        "log_loss": 0.6469088333787776,
-        "brier": 0.22730286138942155,
-        "auc": 0.5445703641405811
+        "log_loss": 0.6466651002406223,
+        "brier": 0.22717984382546813,
+        "auc": 0.5468367850894189
       },
       "mlp": {
-        "log_loss": 0.6532469957314324,
-        "brier": 0.23009445617664442,
-        "auc": 0.5298194464870142
+        "log_loss": 0.6497647264567468,
+        "brier": 0.22859789342615167,
+        "auc": 0.5325572853308885
       }
     },
     "shipped_model_v1_on_2026": {
-      "log_loss": 0.6484740183941027,
-      "brier": 0.22801681100784252,
-      "auc": 0.5342339642880386
+      "log_loss": 0.648430003082934,
+      "brier": 0.22799587236325952,
+      "auc": 0.5346347926443781
     },
     "prior_production_model": {
       "train_seasons": [
@@ -60,33 +60,33 @@
       ],
       "test_season": 2026,
       "n_train_rows": 37317,
-      "n_test_rows": 10222,
+      "n_test_rows": 10240,
       "candidate_comparison": {
         "logreg": {
-          "log_loss": 0.6479405174419005,
-          "brier": 0.22777436287812394,
-          "auc": 0.5356996065222134
+          "log_loss": 0.6482621308109721,
+          "brier": 0.22792458278852662,
+          "auc": 0.5351948544692925
         },
         "random_forest": {
-          "log_loss": 0.6461394781456621,
-          "brier": 0.22695087265229502,
-          "auc": 0.5466389469874756
+          "log_loss": 0.6464617420721093,
+          "brier": 0.22710232703181177,
+          "auc": 0.5460044463477971
         },
         "gbm": {
-          "log_loss": 0.6466430074371152,
-          "brier": 0.22718223549999858,
-          "auc": 0.5443139767073388
+          "log_loss": 0.6469088333787776,
+          "brier": 0.22730286138942155,
+          "auc": 0.5445703641405811
         },
         "mlp": {
-          "log_loss": 0.6486858073719691,
-          "brier": 0.2281031455414409,
-          "auc": 0.5391776425322308
+          "log_loss": 0.6532469957314324,
+          "brier": 0.23009445617664442,
+          "auc": 0.5298194464870142
         }
       },
       "shipped_model_v1_on_2026": {
-        "log_loss": 0.6481788575332623,
-        "brier": 0.22787705345414064,
-        "auc": 0.5344165759825785
+        "log_loss": 0.6484740183941027,
+        "brier": 0.22801681100784252,
+        "auc": 0.5342339642880386
       },
       "prior_production_model": {
         "train_seasons": [
@@ -99,48 +99,86 @@
         "n_test_rows": 10222,
         "candidate_comparison": {
           "logreg": {
-            "log_loss": 0.6479629964690776,
-            "brier": 0.22778485679278193,
-            "auc": 0.5355559159868242
+            "log_loss": 0.6479405174419005,
+            "brier": 0.22777436287812394,
+            "auc": 0.5356996065222134
           },
           "random_forest": {
-            "log_loss": 0.646275408506225,
-            "brier": 0.22701222745621227,
-            "auc": 0.5458199926614518
+            "log_loss": 0.6461394781456621,
+            "brier": 0.22695087265229502,
+            "auc": 0.5466389469874756
           },
           "gbm": {
-            "log_loss": 0.6468062734413543,
-            "brier": 0.2272591360786492,
-            "auc": 0.5440594326015531
+            "log_loss": 0.6466430074371152,
+            "brier": 0.22718223549999858,
+            "auc": 0.5443139767073388
           },
           "mlp": {
-            "log_loss": 0.6507462824273029,
-            "brier": 0.2290315379871068,
-            "auc": 0.5323761158962553
+            "log_loss": 0.6486858073719691,
+            "brier": 0.2281031455414409,
+            "auc": 0.5391776425322308
           }
         },
         "shipped_model_v1_on_2026": {
-          "log_loss": 0.6477430586249523,
-          "brier": 0.22768835813729596,
-          "auc": 0.5361018017162815
+          "log_loss": 0.6481788575332623,
+          "brier": 0.22787705345414064,
+          "auc": 0.5344165759825785
         },
         "prior_production_model": {
-          "description": "v1: 6-feature GBM (career_avg, platoon_delta, pitcher_oba_against, park_factor, is_home, batting_order), trained/validated with a within-2025-season date split only.",
-          "within_season_2025_holdout_metrics_at_fit_time": {
-            "log_loss": 0.64492514625245,
-            "brier": 0.22647538941640857,
-            "auc": 0.5818612095777352
+          "train_seasons": [
+            2023,
+            2024,
+            2025
+          ],
+          "test_season": 2026,
+          "n_train_rows": 37317,
+          "n_test_rows": 10222,
+          "candidate_comparison": {
+            "logreg": {
+              "log_loss": 0.6479629964690776,
+              "brier": 0.22778485679278193,
+              "auc": 0.5355559159868242
+            },
+            "random_forest": {
+              "log_loss": 0.646275408506225,
+              "brier": 0.22701222745621227,
+              "auc": 0.5458199926614518
+            },
+            "gbm": {
+              "log_loss": 0.6468062734413543,
+              "brier": 0.2272591360786492,
+              "auc": 0.5440594326015531
+            },
+            "mlp": {
+              "log_loss": 0.6507462824273029,
+              "brier": 0.2290315379871068,
+              "auc": 0.5323761158962553
+            }
           },
-          "scored_on_true_2026_holdout": {
-            "log_loss": 0.647796095388469,
-            "brier": 0.22771480194567997,
-            "auc": 0.5332748051628007
-          }
+          "shipped_model_v1_on_2026": {
+            "log_loss": 0.6477430586249523,
+            "brier": 0.22768835813729596,
+            "auc": 0.5361018017162815
+          },
+          "prior_production_model": {
+            "description": "v1: 6-feature GBM (career_avg, platoon_delta, pitcher_oba_against, park_factor, is_home, batting_order), trained/validated with a within-2025-season date split only.",
+            "within_season_2025_holdout_metrics_at_fit_time": {
+              "log_loss": 0.64492514625245,
+              "brier": 0.22647538941640857,
+              "auc": 0.5818612095777352
+            },
+            "scored_on_true_2026_holdout": {
+              "log_loss": 0.647796095388469,
+              "brier": 0.22771480194567997,
+              "auc": 0.5332748051628007
+            }
+          },
+          "note": "random_forest scored marginally better on this same 2026 holdout (log_loss 0.6463 vs this gbm's 0.6468) but was rejected: sklearn's RandomForestClassifier has no monotonic-constraint mechanism, and direct point-checks showed it predicting a .230 career hitter below a .200 one at otherwise-default features -- the same backwards-prediction pathology monotonic_cst was introduced to fix in the original 6-feature model. This gbm has monotonic_cst applied (see scripts/train_ml_model.py MONOTONIC_CST) and was verified by point-checks across every constrained feature before shipping."
         },
-        "note": "random_forest scored marginally better on this same 2026 holdout (log_loss 0.6463 vs this gbm's 0.6468) but was rejected: sklearn's RandomForestClassifier has no monotonic-constraint mechanism, and direct point-checks showed it predicting a .230 career hitter below a .200 one at otherwise-default features -- the same backwards-prediction pathology monotonic_cst was introduced to fix in the original 6-feature model. This gbm has monotonic_cst applied (see scripts/train_ml_model.py MONOTONIC_CST) and was verified by point-checks across every constrained feature before shipping."
+        "note": "Adds bvp_delta (batter history vs. this specific opposing pitcher, delta vs season-to-date average) to the prior 12-feature model. Found via scripts/test_bvp.py (since removed -- superseded by this production integration; see git history and README for the original finding: 94.8% of a 2000-draw bootstrap favored including it, no obvious confound mechanism unlike the rejected bullpen-quality feature). Verified monotonic (non-decreasing in bvp_delta) by point-check before shipping."
       },
-      "note": "Adds bvp_delta (batter history vs. this specific opposing pitcher, delta vs season-to-date average) to the prior 12-feature model. Found via scripts/test_bvp.py (since removed -- superseded by this production integration; see git history and README for the original finding: 94.8% of a 2000-draw bootstrap favored including it, no obvious confound mechanism unlike the rejected bullpen-quality feature). Verified monotonic (non-decreasing in bvp_delta) by point-check before shipping."
+      "note": "bvp_delta is now thresholded: treated as 0 (no information) below MIN_BVP_AB=3 prior at-bats vs. the exact opposing pitcher, instead of always using the raw delta regardless of sample size. Found via scripts/test_bvp_sample_size.py after a user spotted a 2-for-2 showing up as \"has hit this pitcher well historically\" on the live site -- a real number from too small a sample to support that claim. Tested 6 candidates (hard thresholds at 3/5/10 AB, shrinkage at C=5/10/20): a light threshold (>=3 AB) was the best of all of them (log_loss 0.6470 -> 0.6469, 82% of a 2000-draw bootstrap favoring it); heavier thresholds (5, 10 AB) scored WORSE than the unthresholded version, meaning real signal exists in the 3-9 AB range that an aggressive cutoff would throw away. Verified monotonic (conditionally, like platoon_delta) by point-check before shipping."
     },
-    "note": "bvp_delta is now thresholded: treated as 0 (no information) below MIN_BVP_AB=3 prior at-bats vs. the exact opposing pitcher, instead of always using the raw delta regardless of sample size. Found via scripts/test_bvp_sample_size.py after a user spotted a 2-for-2 showing up as \"has hit this pitcher well historically\" on the live site -- a real number from too small a sample to support that claim. Tested 6 candidates (hard thresholds at 3/5/10 AB, shrinkage at C=5/10/20): a light threshold (>=3 AB) was the best of all of them (log_loss 0.6470 -> 0.6469, 82% of a 2000-draw bootstrap favoring it); heavier thresholds (5, 10 AB) scored WORSE than the unthresholded version, meaning real signal exists in the 3-9 AB range that an aggressive cutoff would throw away. Verified monotonic (conditionally, like platoon_delta) by point-check before shipping."
+    "note": "Follow-up to the bvp_delta sample-size fix: audited every other fractional feature for the same problem (scripts/test_sample_size_audit.py). pitcher_oba_against (season-to-date, min 3 AB faced), career_avg, and career_obp all showed real, validated improvement from empirical-Bayes shrinkage toward league average (shrunk = raw*w + league_avg*(1-w), w=n/(n+C)): C=25/600/100 respectively. Combined bootstrap vs the fully-raw version: log_loss 0.6468 -> 0.6467, 67% of a 2000-draw bootstrap favoring the shrunk version. Verified monotonic by point-check before shipping. career_k_rate, career_bb_rate, pitcher_era_career, and pitcher_k9_career were tested the same way and shrinkage measurably HURT them at every strength tried -- left raw, deliberately."
   }
 }
