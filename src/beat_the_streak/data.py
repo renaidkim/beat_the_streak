@@ -69,6 +69,16 @@ SHRINK_C_PITCHER_OBA = 25
 SHRINK_C_CAREER_AVG = 600
 SHRINK_C_CAREER_OBP = 100
 
+# Recency weighting for career_k_rate: prior seasons weighted by
+# DECAY_CAREER_K_RATE**(seasons_ago) before summing strikeouts/PA,
+# instead of every prior season counting equally -- matches
+# scripts/train_ml_model.py's DECAY_CAREER_K_RATE, the value the shipped
+# model was actually trained with (scripts/test_recency_weighting.py and
+# scripts/test_recency_weighting_combos.py for why only this one feature
+# ships with recency weighting, not pitcher_era_career/pitcher_k9_career
+# too). Keep in sync with train_ml_model.py.
+DECAY_CAREER_K_RATE = 0.5
+
 # How many ids to pack into one batched /people request. The API accepted
 # 80 comma-separated ids without complaint in testing; 50 leaves headroom.
 PEOPLE_BATCH_SIZE = 50
@@ -439,11 +449,15 @@ def _career_hitting_rates_entering_season(
     every season strictly before season_year, from the person's
     yearByYear stat group. Rates are recomputed from summed counts, not
     averaged from each season's own rate, so a 230-PA rookie season
-    doesn't get weighted the same as a 650-PA everyday one. None if
-    there's no prior-season data (a rookie) -- callers fall back to
-    season-level figures in that case.
+    doesn't get weighted the same as a 650-PA everyday one. k_rate
+    additionally weights each season's counts by DECAY_CAREER_K_RATE**
+    (seasons_ago) before summing -- avg/obp/bb_rate stay flat, tested and
+    found not to benefit the same way. None if there's no prior-season
+    data (a rookie) -- callers fall back to season-level figures in that
+    case.
     """
-    ab = hits = bb = hbp = sf = so = pa = 0
+    ab = hits = bb = hbp = sf = pa = 0
+    weighted_so = weighted_pa = 0.0  # recency-weighted, for k_rate only -- see DECAY_CAREER_K_RATE
     for stat_group in person.get("stats", []):
         if stat_group.get("type", {}).get("displayName") != "yearByYear":
             continue
@@ -457,8 +471,10 @@ def _career_hitting_rates_entering_season(
             bb += int(st.get("baseOnBalls", 0))
             hbp += int(st.get("hitByPitch", 0))
             sf += int(st.get("sacFlies", 0))
-            so += int(st.get("strikeOuts", 0))
             pa += int(st.get("plateAppearances", 0))
+            w = DECAY_CAREER_K_RATE ** (season_year - season - 1)
+            weighted_so += w * int(st.get("strikeOuts", 0))
+            weighted_pa += w * int(st.get("plateAppearances", 0))
     if ab == 0:
         return None
     obp_den = ab + bb + hbp + sf
@@ -466,7 +482,7 @@ def _career_hitting_rates_entering_season(
     return {
         "avg": avg,
         "obp": (hits + bb + hbp) / obp_den if obp_den > 0 else avg,
-        "k_rate": so / pa if pa > 0 else LEAGUE_AVG_K_RATE,
+        "k_rate": weighted_so / weighted_pa if weighted_pa > 0 else LEAGUE_AVG_K_RATE,
         "bb_rate": bb / pa if pa > 0 else LEAGUE_AVG_BB_RATE,
         "ab": ab,
     }

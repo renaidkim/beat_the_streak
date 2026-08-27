@@ -101,14 +101,40 @@ MONOTONIC_SAFE_CANDIDATES = {"logreg", "gbm"}
 # justification (scripts/test_bvp_sample_size.py).
 MIN_BVP_AB = 3
 
+# Recency weighting: prior seasons weighted by decay**(seasons_ago)
+# before summing counts, instead of every prior season counting equally.
+# A different correction from the SHRINK_C_* sample-size shrinkage above
+# -- shrinkage asks "how much total sample backs this rate", recency
+# weighting asks "is data from 5 years ago as informative as last
+# year's". Found via scripts/test_recency_weighting.py: individually,
+# recency weighting helped career_k_rate (82.7% bootstrap favoring) and
+# both pitcher_era_career/pitcher_k9_career (69.8%/63.6%) -- all three
+# features SHRINKAGE had actively hurt (see the sample-size audit).
+# career_avg/career_obp/career_bb_rate were tested the same way and
+# recency weighting didn't help there -- those keep their existing
+# (flat, sample-size-shrunk where applicable) treatment.
+#
+# BUT combining all three did not just add up: scripts/
+# test_recency_weighting_combos.py swept every subset and found
+# pitcher_era_career+pitcher_k9_career combined together is actively
+# harmful (0.8% favoring, worse than either alone) -- both are derived
+# from the same pitcher's outs with the same decay, so weighting both
+# gives the GBM two highly-correlated-but-not-identical signals that its
+# splits handle worse than one clean one. Every 2+ feature combination
+# tested worse than career_k_rate alone. Only career_k_rate ships with
+# recency weighting; pitcher_era_career/pitcher_k9_career stay flat.
+DECAY_CAREER_K_RATE = 0.5
+
 
 # ----------------------------------------------------------- career agg ---
 
 
 def batter_career_rates(splits: list[dict], season_year: int) -> dict | None:
     ab = hits = bb = hbp = sf = tb = so = pa = hr = 0
+    weighted_so = weighted_pa = 0.0  # recency-weighted, for k_rate only -- see DECAY_CAREER_K_RATE
     for s in splits:
-        if int(s.get("season", season_year)) >= season_year:
+        season = int(s.get("season", season_year))
+        if season >= season_year:
             continue
         st = s["stat"]
         ab += int(st.get("atBats", 0))
@@ -120,6 +146,9 @@ def batter_career_rates(splits: list[dict], season_year: int) -> dict | None:
         so += int(st.get("strikeOuts", 0))
         pa += int(st.get("plateAppearances", 0))
         hr += int(st.get("homeRuns", 0))
+        w = DECAY_CAREER_K_RATE ** (season_year - season - 1)
+        weighted_so += w * int(st.get("strikeOuts", 0))
+        weighted_pa += w * int(st.get("plateAppearances", 0))
     if ab == 0:
         return None
     avg = hits / ab
@@ -130,7 +159,11 @@ def batter_career_rates(splits: list[dict], season_year: int) -> dict | None:
     babip = (hits - hr) / babip_den if babip_den > 0 else avg
     return {
         "avg": avg, "obp": obp, "slg": slg, "iso": slg - avg, "babip": babip,
-        "bb_rate": bb / pa if pa > 0 else 0.0, "k_rate": so / pa if pa > 0 else 0.0,
+        "bb_rate": bb / pa if pa > 0 else 0.0,
+        # k_rate uses recency-weighted counts (won 82% of a bootstrap
+        # against the flat version -- test_recency_weighting.py), unlike
+        # every other rate here which stayed flat.
+        "k_rate": weighted_so / weighted_pa if weighted_pa > 0 else 0.0,
         "ab": ab, "pa": pa,
     }
 
@@ -147,9 +180,19 @@ def batter_last_known_age(splits: list[dict], season_year: int) -> float | None:
 
 
 def pitcher_career_rates(splits: list[dict], season_year: int) -> dict | None:
+    # era/k9 individually beat shrinkage-only with recency weighting
+    # (69.8%/63.6% bootstrap, scripts/test_recency_weighting.py), but
+    # weighting both together was actively harmful (0.8% favoring,
+    # scripts/test_recency_weighting_combos.py) -- they're both derived
+    # from this pitcher's same outs count, so double-weighting gives the
+    # GBM two correlated-but-slightly-different signals it splits on
+    # worse than one flat one. Kept flat here; only career_k_rate (see
+    # DECAY_CAREER_K_RATE) ships with recency weighting. whip/bb9/hr9
+    # stay flat too -- unused, no reason to weight what nothing reads.
     outs = er = bb = k = hr = hits = 0
     for s in splits:
-        if int(s.get("season", season_year)) >= season_year:
+        season = int(s.get("season", season_year))
+        if season >= season_year:
             continue
         st = s["stat"]
         outs += int(st.get("outs", 0))
@@ -162,8 +205,10 @@ def pitcher_career_rates(splits: list[dict], season_year: int) -> dict | None:
         return None
     innings = outs / 3
     return {
-        "era": er * 27 / outs, "whip": (bb + hits) / innings,
-        "k9": k * 27 / outs, "bb9": bb * 27 / outs, "hr9": hr * 27 / outs,
+        "era": er * 27 / outs,
+        "whip": (bb + hits) / innings,
+        "k9": k * 27 / outs,
+        "bb9": bb * 27 / outs, "hr9": hr * 27 / outs,
         "outs": outs,
     }
 

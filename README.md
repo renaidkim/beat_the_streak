@@ -609,6 +609,65 @@ doesn't rule out that a *specific cause* behind a slump (injury, a real
 swing change) could matter -- the model has no way to see that either
 way, only the raw average.
 
+### Round six: recency weighting -- a different correction from shrinkage
+
+Round five's shrinkage audit left an odd result unexplained: shrinkage
+toward league average helped the batting-average-family features but
+*hurt* `career_k_rate`/`career_bb_rate`/`pitcher_era_career`/
+`pitcher_k9_career`. Shrinkage only asks "how much total sample backs
+this rate" -- it weights a rookie season and a decade-old season
+equally as long as the total count is the same. A different question:
+is a stat from five years ago as informative about *today's* skill as
+one from last year? For pitchers especially, stuff and role change
+year to year in ways sample-size correction alone can't see. Real
+projection systems (Marcel, etc.) weight recent seasons more heavily
+for exactly this reason.
+
+`scripts/test_recency_weighting.py` tested recency-weighted versions
+(`weighted_count = sum(count_i * decay**seasons_ago_i)` before computing
+the rate, decay swept over 0.5/0.7/0.85) of all four shrinkage-resistant
+features, plus `career_avg`/`career_obp` for completeness (recency
+weighting is additive, not a replacement, for whichever correction
+already ships):
+
+| Feature | Result |
+| :--- | :--- |
+| `career_avg` | No real improvement (56.9% bootstrap -- a coin flip) |
+| `career_obp` | No improvement |
+| `career_bb_rate` | No improvement |
+| `career_k_rate` | **Helped** -- decay=0.5, 82.7% bootstrap favoring |
+| `pitcher_era_career` | **Helped** -- decay=0.85, 69.8% bootstrap favoring |
+| `pitcher_k9_career` | **Helped** -- decay=0.85, 63.6% bootstrap favoring |
+
+Three individual wins. But combining them wasn't just additive:
+`scripts/test_recency_weighting_ship.py` bootstrapped all three
+together against the shipped (shrinkage-only) model and got a coin
+flip, 47.0% favoring -- *worse* than any single feature alone.
+`scripts/test_recency_weighting_combos.py` then swept all seven
+non-empty subsets of the three features and found why: pairing
+`pitcher_era_career` with `pitcher_k9_career` specifically is actively
+harmful (0.8% favoring, log loss clearly worse), and every other
+2+-feature combination underperformed its best individual member too.
+Both pitcher features are derived from the same career outs count with
+the same decay -- weighting both hands the tree model two
+highly-correlated-but-not-identical signals, and its splits handle that
+worse than one clean signal. `career_k_rate` alone remained the
+strongest result even after the sweep (log loss 0.6467 -> 0.6465, 82.7%
+favoring) and is the only one of the three shipped; `pitcher_era_career`
+and `pitcher_k9_career` stay flat, unchanged from round five.
+
+The concrete lesson: features that each individually pass the bar don't
+automatically compose, especially when they're derived from overlapping
+raw counts. Worth checking combined effects even after every individual
+piece has already cleared the bar on its own -- exactly what caught this
+before it shipped. Promoted `career_k_rate`'s recency weighting into
+both the training pipeline (`train_ml_model.py`'s
+`DECAY_CAREER_K_RATE`/`batter_career_rates`) and live serving
+(`data.py`'s `DECAY_CAREER_K_RATE`/`_career_hitting_rates_entering_season`,
+kept in sync by comment) -- verified monotonic by point-check across
+three feature contexts before shipping, same discipline as every prior
+change to this model.
+
 ## Why same-pitcher picks aren't avoided
 
 `pick_top` used to skip a pick if it shared an opposing pitcher with one

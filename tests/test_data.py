@@ -43,8 +43,32 @@ def test_career_hitting_rates_excludes_current_season():
     rates = _career_hitting_rates_entering_season(person, 2025)
     # (100 + 150) / (400 + 500), not including the 2025 row
     assert rates["avg"] == (100 + 150) / (400 + 500)
-    assert rates["k_rate"] == (80 + 100) / (450 + 570)
     assert rates["bb_rate"] == (40 + 60) / (450 + 570)
+    # k_rate is recency-weighted: 2023 (2 seasons ago) gets decay**1,
+    # 2024 (1 season ago) gets decay**0 = 1.
+    decay = 0.5
+    w_so = decay**1 * 80 + decay**0 * 100
+    w_pa = decay**1 * 450 + decay**0 * 570
+    assert rates["k_rate"] == w_so / w_pa
+
+
+def test_career_hitting_rates_k_rate_weights_recent_seasons_more():
+    # Two players with the same total career strikeouts/PA, but one
+    # trending toward more contact recently and one trending toward more
+    # strikeouts recently, should NOT get the same k_rate once weighted.
+    def make(order):
+        splits = []
+        for season, so, pa in order:
+            splits.append({"season": str(season), "stat": {"strikeOuts": so, "plateAppearances": pa, "atBats": pa}})
+        return {"stats": [{"type": {"displayName": "yearByYear"}, "splits": splits}]}
+
+    improving = make([(2022, 150, 500), (2023, 100, 500)])  # fewer Ks recently
+    declining = make([(2022, 100, 500), (2023, 150, 500)])  # more Ks recently
+    r_improving = _career_hitting_rates_entering_season(improving, 2024)
+    r_declining = _career_hitting_rates_entering_season(declining, 2024)
+    # Flat sums would give both players an identical k_rate (250/1000);
+    # recency weighting must break that tie in the intuitive direction.
+    assert r_improving["k_rate"] < r_declining["k_rate"]
 
 
 def test_career_hitting_rates_none_when_no_prior_seasons():
