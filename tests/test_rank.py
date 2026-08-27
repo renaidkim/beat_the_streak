@@ -43,15 +43,33 @@ def test_higher_strikeout_pitcher_lowers_probability():
     )
 
 
+def test_bvp_reason_includes_at_bat_count_not_just_historically():
+    # Spelling out the sample size (not just saying "historically") is
+    # the whole point -- a reader can judge a 2-for-2 differently than a
+    # 20-for-60 even though rank.py doesn't hard-block the reason itself
+    # (the data layer already zeroes bvp_delta below MIN_BVP_AB, so this
+    # only ever fires on a sample the model trusted in the first place).
+    matchup = make_matchup(bvp_delta=0.150, bvp_ab=12)
+    pick = score_matchup(matchup)
+    assert any("12 career at-bats" in r for r in pick.reasons)
+    assert not any("historically" in r for r in pick.reasons)
+
+
 def test_poor_history_against_this_pitcher_lowers_probability():
-    # bvp_delta's effect in the shipped model is concentrated at
-    # strongly negative values (verified by point-check when the
-    # feature was added) -- a batter who's clearly struggled against
-    # this specific pitcher scores lower; the effect flattens out
-    # above roughly neutral history, similar to how platoon_delta is
-    # conditionally rather than uniformly important.
-    struggled = make_matchup(bvp_delta=-0.35)
-    neutral = make_matchup(bvp_delta=0.0)
+    # bvp_delta is conditionally rather than uniformly important, like
+    # platoon_delta -- flat at the plain default context, but shows a
+    # real drop in this one (confirmed by point-check when the sample-
+    # size threshold was added). bvp_ab must clear MIN_BVP_AB or
+    # bvp_delta gets zeroed at the data layer regardless of what's
+    # passed here -- this test builds the Matchup directly, bypassing
+    # that, so bvp_ab is set high enough to be realistic either way.
+    context = dict(
+        batter=make_batter(career_avg=0.230, career_obp=0.290, career_k_rate=0.28, career_bb_rate=0.06, age=30.0, bats="L"),
+        pitcher=make_pitcher(throws="L", era=3.2, oba_against=0.21, era_career=3.2, k9_career=10.5),
+        is_home=False, park_factor=0.9, batting_order=8, bvp_ab=15,
+    )
+    struggled = make_matchup(bvp_delta=-0.20, **context)
+    neutral = make_matchup(bvp_delta=0.0, **context)
     assert (
         score_matchup(struggled).hit_probability
         < score_matchup(neutral).hit_probability

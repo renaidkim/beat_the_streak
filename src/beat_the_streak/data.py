@@ -52,6 +52,13 @@ LEAGUE_AVG_ERA = 4.30
 LEAGUE_AVG_K_RATE = 0.22
 LEAGUE_AVG_BB_RATE = 0.08
 
+# Minimum prior at-bats vs. the exact opposing pitcher before bvp_delta
+# is trusted rather than treated as 0 (no information) -- matches
+# scripts/train_ml_model.py's MIN_BVP_AB, the value the shipped model
+# was actually trained and validated with (see that file's comment for
+# the empirical justification). Keep these two in sync.
+MIN_BVP_AB = 3
+
 # How many ids to pack into one batched /people request. The API accepted
 # 80 comma-separated ids without complaint in testing; 50 leaves headroom.
 PEOPLE_BATCH_SIZE = 50
@@ -136,10 +143,10 @@ class MlbStatsApiSource(DataSource):
                 batter = batters.get(batter_id)
                 if batter is None:
                     continue
-                bvp_delta = (
+                bvp_delta, bvp_ab = (
                     self._get_bvp_delta(batter_id, pitcher_id, batter.season_avg)
                     if isinstance(pitcher_id, int)
-                    else 0.0  # TBD placeholder pitcher -- no specific pitcher to have history against
+                    else (0.0, 0)  # TBD placeholder pitcher -- no specific pitcher to have history against
                 )
                 matchups.append(
                     Matchup(
@@ -149,25 +156,34 @@ class MlbStatsApiSource(DataSource):
                         park_factor=gm["park_factor"],
                         batting_order=slot,
                         bvp_delta=bvp_delta,
+                        bvp_ab=bvp_ab,
                         game_started=gm["game_started"],
                     )
                 )
         return matchups
 
-    def _get_bvp_delta(self, batter_id: int, pitcher_id: int, season_avg: float) -> float:
-        """This batter's history against this specific pitcher, delta vs.
-        their own season-to-date average. MLB's vsPlayer stat type needs
-        one request per (batter, pitcher) pair -- no batching -- so this
-        is only feasible called once per matchup during a live slate
-        build (a few hundred requests/day), not for backtesting training
-        data (tens of thousands of pairs); see
-        scripts/train_ml_model.py's _compute_bvp_history for the cheaper,
-        truncated-window proxy used there instead.
+    def _get_bvp_delta(self, batter_id: int, pitcher_id: int, season_avg: float) -> tuple[float, int]:
+        """(delta, at_bats): this batter's history against this specific
+        pitcher, delta vs. their own season-to-date average, and the
+        at-bat count behind it. MLB's vsPlayer stat type needs one
+        request per (batter, pitcher) pair -- no batching -- so this is
+        only feasible called once per matchup during a live slate build
+        (a few hundred requests/day), not for backtesting training data
+        (tens of thousands of pairs); see scripts/train_ml_model.py's
+        _compute_bvp_history for the cheaper, truncated-window proxy
+        used there instead.
 
         The response includes a season=None aggregate row *in addition
         to* the per-season breakdown (verified directly against the live
         API) -- summing everything would double-count, so only the
         dated, per-season splits are summed here.
+
+        delta is 0.0 (no information) below MIN_BVP_AB at-bats, even
+        though the real at_bats count is still returned -- e.g. a
+        2-for-2 shouldn't move the model or be described as "historical"
+        performance. See MIN_BVP_AB's comment for why this specific
+        threshold (empirically the best of several tested, not just a
+        round number).
         """
         cache_key = (batter_id, pitcher_id)
         if cache_key in self._bvp_cache:
@@ -191,9 +207,10 @@ class MlbStatsApiSource(DataSource):
                 stat = split.get("stat", {})
                 ab += int(stat.get("atBats", 0))
                 hits += int(stat.get("hits", 0))
-        delta = (hits / ab - season_avg) if ab > 0 else 0.0
-        self._bvp_cache[cache_key] = delta
-        return delta
+        delta = (hits / ab - season_avg) if ab >= MIN_BVP_AB else 0.0
+        result = (delta, ab)
+        self._bvp_cache[cache_key] = result
+        return result
 
     def _get_schedule_with_probables(self, date: str) -> list[dict[str, Any]]:
         resp = self._session.get(
@@ -489,6 +506,7 @@ class FixtureSource(DataSource):
                     park_factor=entry["park_factor"],
                     batting_order=entry.get("batting_order"),
                     bvp_delta=entry.get("bvp_delta", 0.0),
+                    bvp_ab=entry.get("bvp_ab", 0),
                     game_started=entry.get("game_started", False),
                 )
             )

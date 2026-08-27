@@ -497,6 +497,30 @@ matchup, which took a real slate from ~2 seconds to ~35-40 seconds (see
 [Performance](#performance)) -- a deliberate tradeoff given the
 strength of the result, not an oversight.
 
+**Sample-size correction, added right after shipping:** live traffic
+surfaced a real problem -- a batter who'd gone 2-for-2 against a pitcher
+showed up with "has hit this pitcher well historically," a real number
+from a sample far too small to support that claim. `scripts/
+test_bvp_sample_size.py` tested whether `bvp_delta` should be
+discounted below some minimum at-bat count, two ways: a hard threshold
+(zero it out below N at-bats) and empirical-Bayes-style shrinkage
+(`delta * ab/(ab+C)`, pulling small samples toward 0 continuously
+instead of an all-or-nothing cutoff). Six candidates tested against the
+raw always-on version on the true 2026 holdout: the lightest hard
+threshold (`>= 3` at-bats) won outright -- log loss 0.6470 -> 0.6469,
+82% of a 2000-draw bootstrap favoring it, the best of everything tried.
+Heavier thresholds (`>= 5`, `>= 10`) scored *worse* than the raw
+version, not better -- there's real signal in the 3-9 at-bat range that
+an aggressive cutoff throws away, even though the smallest samples (1-2
+at-bats, ~41% of rows have at least one prior at-bat but most of those
+are tiny) really are just noise. Promoted `MIN_BVP_AB = 3` into both
+the training pipeline and live serving (`data.MIN_BVP_AB`, kept in sync
+by comment) -- `bvp_delta` is now 0.0 (no information) below 3 prior
+at-bats against the exact pitcher, at both training and prediction
+time. The reason text also now spells out the actual at-bat count
+("has hit this pitcher well in 11 career at-bats...") instead of saying
+"historically," which even 3-9 at-bats doesn't really support.
+
 Rerun `python scripts/fit_ml_model.py` (fetches and caches 2023-2026
 data) then `python scripts/train_ml_model.py` (builds features, trains,
 picks a winner among the monotonic-safe candidates, writes

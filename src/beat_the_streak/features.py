@@ -35,6 +35,7 @@ class BatterFeatures:
     park_factor: float
     batting_order: float  # 1-9, or DEFAULT_BATTING_ORDER when unknown
     bvp_delta: float  # this batter's history vs. this specific pitcher, delta vs season avg
+    bvp_ab: int  # at-bats behind bvp_delta -- 0 if never faced, or below MIN_BVP_AB
 
 
 def build_features(matchup: Matchup) -> BatterFeatures:
@@ -54,4 +55,5 @@ def build_features(matchup: Matchup) -> BatterFeatures:
         if matchup.batting_order is not None
         else DEFAULT_BATTING_ORDER,
         bvp_delta=matchup.bvp_delta,
+        bvp_ab=matchup.bvp_ab,
     )

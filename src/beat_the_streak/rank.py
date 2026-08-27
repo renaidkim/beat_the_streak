@@ -8,7 +8,9 @@ order, the opposing pitcher's career strikeouts-per-9 and career ERA
 average against, park factor, the batter's career average/OBP/strikeout
 rate/walk rate (career, entering this season), age, both players'
 handedness, and this batter's own history against this specific
-opposing pitcher (delta vs. their season-to-date average).
+opposing pitcher (delta vs. their season-to-date average, treated as 0
+-- no information -- below `data.MIN_BVP_AB` prior at-bats against that
+exact pitcher, so a 2-for-2 doesn't get treated as a real signal).
 
 Most of these were chosen by permutation importance out of a broader
 ~24-feature set (scripts/train_ml_model.py) that also tried platoon
@@ -152,10 +154,21 @@ def _explain(features: BatterFeatures, pitcher_confirmed: bool) -> list[str]:
     elif features.batting_order >= 8:
         reasons.append(f"batting near the bottom of the order ({int(features.batting_order)})")
 
+    # bvp_delta is already 0.0 below MIN_BVP_AB at-bats (see data.py /
+    # train_ml_model.py) -- these thresholds only ever fire on a sample
+    # size the model actually trusted. The at-bat count is spelled out
+    # rather than saying "historically", which a handful of at-bats
+    # doesn't really support even past that threshold.
     if features.bvp_delta >= 0.100:
-        reasons.append(f"has hit this pitcher well historically ({features.bvp_delta:+.3f} vs. own season avg)")
+        reasons.append(
+            f"has hit this pitcher well in {features.bvp_ab} career at-bats "
+            f"({features.bvp_delta:+.3f} vs. own season avg)"
+        )
     elif features.bvp_delta <= -0.100:
-        reasons.append(f"has struggled against this pitcher historically ({features.bvp_delta:+.3f} vs. own season avg)")
+        reasons.append(
+            f"has struggled against this pitcher in {features.bvp_ab} career at-bats "
+            f"({features.bvp_delta:+.3f} vs. own season avg)"
+        )
 
     return reasons
 

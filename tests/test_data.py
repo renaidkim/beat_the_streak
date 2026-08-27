@@ -126,6 +126,7 @@ def test_bvp_delta_excludes_season_none_aggregate_row():
     # The vsPlayer endpoint's response includes a season=None row that's
     # already the sum of the per-season rows below it (verified directly
     # against the live API) -- summing everything would double-count.
+    # 6 total at-bats clears MIN_BVP_AB, so the delta isn't zeroed.
     payload = {
         "stats": [
             {
@@ -139,13 +140,25 @@ def test_bvp_delta_excludes_season_none_aggregate_row():
         ]
     }
     source = MlbStatsApiSource(session=_FakeSession(payload))
-    delta = source._get_bvp_delta(batter_id=1, pitcher_id=2, season_avg=0.250)
+    delta, ab = source._get_bvp_delta(batter_id=1, pitcher_id=2, season_avg=0.250)
     # (1 + 1 + 0) / (2 + 1 + 3) - 0.250, not (2+1+1+0)/(6+2+1+3)
     assert delta == (1 + 1 + 0) / (2 + 1 + 3) - 0.250
+    assert ab == 2 + 1 + 3
 
 
 def test_bvp_delta_zero_when_no_prior_meeting():
     payload = {"stats": [{"splits": []}]}
     source = MlbStatsApiSource(session=_FakeSession(payload))
-    delta = source._get_bvp_delta(batter_id=1, pitcher_id=2, season_avg=0.250)
+    delta, ab = source._get_bvp_delta(batter_id=1, pitcher_id=2, season_avg=0.250)
     assert delta == 0.0
+    assert ab == 0
+
+
+def test_bvp_delta_zeroed_below_min_ab_even_with_real_history():
+    # 2-for-2 -- a real result, but too small a sample to trust. ab is
+    # still reported accurately (2), only delta gets zeroed.
+    payload = {"stats": [{"splits": [{"season": "2024", "stat": {"atBats": 2, "hits": 2}}]}]}
+    source = MlbStatsApiSource(session=_FakeSession(payload))
+    delta, ab = source._get_bvp_delta(batter_id=1, pitcher_id=2, season_avg=0.250)
+    assert delta == 0.0
+    assert ab == 2

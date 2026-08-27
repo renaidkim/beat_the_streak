@@ -82,6 +82,12 @@ MONOTONIC_CST = [-1, -1, 1, 1, 1, 0, 1, 0, 1, -1, 0, 0, 1]
 # the multi-family comparison, just never selected.
 MONOTONIC_SAFE_CANDIDATES = {"logreg", "gbm"}
 
+# Minimum prior at-bats vs. the exact opposing pitcher before bvp_delta
+# is trusted rather than treated as 0 (no information) -- see the
+# comment where this is applied in build_dataset for the empirical
+# justification (scripts/test_bvp_sample_size.py).
+MIN_BVP_AB = 3
+
 
 # ----------------------------------------------------------- career agg ---
 
@@ -427,12 +433,23 @@ def build_dataset(seasons: list[int]) -> pd.DataFrame:
     assert len(df) == n_before, "bvp merge changed row count -- join key isn't unique"
     df["bvp_ab_prior"] = df["bvp_ab_prior"].fillna(0)
     df["bvp_hits_prior"] = df["bvp_hits_prior"].fillna(0)
+    # MIN_BVP_AB: zeroing out (treating as "no information") below this
+    # many prior at-bats scored better than the raw, always-on delta on
+    # the true 2026 holdout (scripts/test_bvp_sample_size.py) -- log loss
+    # 0.6469 vs. 0.6470, 82% of a 2000-draw bootstrap favoring it. Higher
+    # thresholds (5, 10 AB) scored *worse*, not better: there's real
+    # signal in the 3-9 AB range that a heavy-handed cutoff throws away,
+    # even though a 1-2 AB sample (e.g. a 2-for-2) really is just noise.
     df["bvp_delta"] = np.where(
-        df["bvp_ab_prior"] > 0,
+        df["bvp_ab_prior"] >= MIN_BVP_AB,
         df["bvp_hits_prior"] / df["bvp_ab_prior"] - df["season_avg_to_date"],
         0.0,
     )
-    df = df.drop(columns=["bvp_ab_prior", "bvp_hits_prior"])
+    # bvp_ab_prior kept (not dropped) -- the sample size behind bvp_delta,
+    # not itself a model feature, but needed by anything checking whether
+    # bvp_delta is backed by enough at-bats to trust (see
+    # scripts/test_bvp_sample_size.py).
+    df = df.drop(columns=["bvp_hits_prior"])
 
     df["date"] = pd.to_datetime(df["date"])
     return df

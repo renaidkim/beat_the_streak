@@ -63,6 +63,11 @@ class Matchup:
     # -- see beat_the_streak.data._get_bvp_delta. 0.0 (neutral) when
     # there's no prior meeting, or the pitcher isn't confirmed yet.
     bvp_delta: float = 0.0
+    # At-bats behind bvp_delta -- not itself a model feature, but needed
+    # to gate the "has hit/struggled against this pitcher" reason text
+    # on a real sample size (a 2-for-2 shouldn't be described as
+    # "historically" anything). See beat_the_streak.rank's MIN_BVP_AB.
+    bvp_ab: int = 0
     # True once this game has started (live or final) -- Beat the Streak
     # only allows picking a player before their game begins, so rank.py's
     # pick_top excludes these from the recommended picks while still
