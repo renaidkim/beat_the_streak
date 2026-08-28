@@ -196,6 +196,39 @@ def test_bvp_delta_zero_when_no_prior_meeting():
     assert ab == 0
 
 
+def test_true_rookie_career_avg_is_shrunk_not_raw_season_avg():
+    # A true rookie (debuted this season, no yearByYear data at all) hot
+    # for a small sample -- .333 on just 57 AB -- must NOT show up as a
+    # .333 "career" average. It should get the same shrinkage-toward-
+    # league-average treatment an established player's small career
+    # sample gets, using this season's own AB as the sample size.
+    payload = {
+        "people": [
+            {
+                "id": 1,
+                "fullName": "Rookie Hitter",
+                "batSide": {"code": "R"},
+                "birthDate": "2001-01-01",
+                "currentTeam": {"name": "Test Team"},
+                "stats": [
+                    {
+                        "type": {"displayName": "season"},
+                        "splits": [{"stat": {"avg": ".333", "obp": ".380", "atBats": 57}}],
+                    },
+                    {"type": {"displayName": "yearByYear"}, "splits": []},
+                ],
+            }
+        ]
+    }
+    source = MlbStatsApiSource(session=_FakeSession(payload))
+    batters = source._get_batters({1}, season_year=2026, as_of_date="2026-08-28")
+    batter = batters[1]
+    # w = 57/(57+600) ~= 0.087 -- shrunk avg should sit close to league
+    # average (.245), nowhere near the raw .333.
+    assert batter.career_avg < 0.27
+    assert batter.career_avg != 0.333
+
+
 def test_bvp_delta_zeroed_below_min_ab_even_with_real_history():
     # 2-for-2 -- a real result, but too small a sample to trust. ab is
     # still reported accurately (2), only delta gets zeroed.

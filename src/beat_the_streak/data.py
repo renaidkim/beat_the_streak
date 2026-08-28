@@ -320,8 +320,21 @@ class MlbStatsApiSource(DataSource):
                     career_avg = _shrink_toward(career["avg"], career["ab"], LEAGUE_AVG_AVG, SHRINK_C_CAREER_AVG)
                     career_obp = _shrink_toward(career["obp"], career["ab"], LEAGUE_AVG_OBP, SHRINK_C_CAREER_OBP)
                 else:
-                    career_avg = season_avg
-                    career_obp = float(season_stat.get("obp") or LEAGUE_AVG_OBP)
+                    # True rookie (debuted this season, no prior-season
+                    # data) -- shrink the season-to-date average/OBP the
+                    # same way, using this season's own at-bats as the
+                    # sample size. Previously this branch used season_avg
+                    # UNSHRUNK: a rookie a few weeks into their debut got
+                    # LESS protection against a small, streaky sample than
+                    # an established player with an equally small career
+                    # sample -- backwards, and a real bug (a 57-AB .333
+                    # debut showed up labeled "strong career hitter" and
+                    # fed the model an unreliable .333 instead of
+                    # something pulled toward league average).
+                    season_ab = int(season_stat.get("atBats", 0))
+                    season_obp_raw = float(season_stat.get("obp") or LEAGUE_AVG_OBP)
+                    career_avg = _shrink_toward(season_avg, season_ab, LEAGUE_AVG_AVG, SHRINK_C_CAREER_AVG)
+                    career_obp = _shrink_toward(season_obp_raw, season_ab, LEAGUE_AVG_OBP, SHRINK_C_CAREER_OBP)
 
                 result[person["id"]] = Batter(
                     id=str(person["id"]),

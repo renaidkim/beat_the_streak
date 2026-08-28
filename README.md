@@ -723,6 +723,48 @@ already available to the model directionally through `bats_L`/
 `pitcher_throws_L`; this specific pitcher's deviation from that average
 just isn't reliably measurable from the sample available here.
 
+### Round eight: a true rookie's career average was never being shrunk
+
+Spotted live: a batter with only 26 career at-bats appeared as a top
+pick, labeled "strong career hitter" off a small hot streak. Traced to
+a real bug in `data.py`'s `_get_batters` -- for a true rookie (debuted
+this season, no prior-season `yearByYear` data at all),
+`_career_hitting_rates_entering_season` correctly returns `None`, but
+the fallback branch then used `career_avg = season_avg` **unshrunk** --
+skipping the exact empirical-Bayes correction (round five) every
+established player's small career sample gets. Backwards: a rookie a
+few weeks into their debut got *less* protection against a small,
+streaky sample than a veteran with an equally small career at-bat
+total. (Pitchers were unaffected: `oba_against` already shrinks off
+season-to-date at-bats unconditionally, rookie or not; `era_career`/
+`k9_career`'s unshrunk rookie fallback is fine too, since shrinkage was
+already tested and rejected for those two features specifically.)
+
+Fixed by shrinking the season-to-date average/OBP the same way,
+substituting this season's own at-bat count as the sample size. A real
+example from the live site: Kaelen Culpepper (debuted 2026-08-07, 57 AB
+at .333 by late August) dropped out of the top-10 entirely once his
+`career_avg` was correctly pulled to ~.253, barely above league
+average, instead of standing at the raw .333.
+
+This path was never caught by the backtest because `build_dataset`
+drops every true-rookie batter-season from training entirely (see
+"Known gaps") -- reasonable for training, but it also meant this
+fallback branch had zero test coverage, live or backtested, until now.
+To check whether the fix alone is enough, or whether recommendations
+also need a hard minimum-at-bat floor on top of it, the true-rookie
+population was temporarily added back into the 2026 holdout (with the
+same fixed shrinkage) and scored with the current production model:
+5 distinct rookie batters, 550 rows, log loss 0.6304 (better than the
+0.6465 non-rookie population), mean predicted hit rate 64.5% vs. actual
+66.5% -- if anything slightly *under*-confident, not overconfident.
+Reassuring, but only 5 players is too small a sample to be a real
+verdict either way -- treat it as "no evidence the shrinkage fix alone
+is dangerous," not "proven safe." Whether to also add a hard minimum-
+career-at-bats eligibility floor (a product/risk-tolerance choice, not
+something this sample size can settle) is an open question for the
+next round.
+
 ## Why same-pitcher picks aren't avoided
 
 `pick_top` used to skip a pick if it shared an opposing pitcher with one
