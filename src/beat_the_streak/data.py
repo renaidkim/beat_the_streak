@@ -21,6 +21,7 @@ from __future__ import annotations
 import datetime
 import json
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -149,6 +150,30 @@ class MlbStatsApiSource(DataSource):
 
         batters = self._get_batters(batter_ids, season_year, date)
         pitchers = self._get_pitchers(pitcher_ids, season_year)
+
+        # Pass 3: bvp_delta's vsPlayer endpoint can't be batched (one
+        # request per (batter, pitcher) pair -- see _get_bvp_delta's
+        # docstring), which used to mean a few hundred sequential
+        # round-trips, ~35-40s of a full slate's build time. These are
+        # independent, read-only GETs, so fire them concurrently instead
+        # and let _get_bvp_delta's existing cache absorb the result --
+        # nothing below this point changes behavior, just how long it
+        # takes to get there.
+        bvp_pairs = {
+            (batter_id, gm["pitcher_id"])
+            for gm in game_matchups
+            if isinstance(gm["pitcher_id"], int)
+            for batter_id in gm["lineup"]
+            if batter_id in batters
+        }
+        if bvp_pairs:
+            with ThreadPoolExecutor(max_workers=20) as pool:
+                futures = [
+                    pool.submit(self._get_bvp_delta, batter_id, pitcher_id, batters[batter_id].season_avg)
+                    for batter_id, pitcher_id in bvp_pairs
+                ]
+                for f in futures:
+                    f.result()  # populates self._bvp_cache; re-raises any request failure
 
         matchups: list[Matchup] = []
         for gm in game_matchups:

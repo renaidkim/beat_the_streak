@@ -854,10 +854,15 @@ One exception: batter-vs-pitcher history (`bvp_delta`, added in the
 has no batching -- one request per (batter, pitcher) pair, unlike
 everything else above. That's roughly one extra request per matchup
 (~150-270/day depending on how many games and confirmed lineups), which
-brought a full slate from ~2 seconds to **~35-40 seconds**. Still well
-under any GitHub Actions timeout and fine for a page that refreshes
-twice a day plus on demand, but a real, deliberate tradeoff -- not free
-like the rest of the batching in this file.
+originally brought a full slate from ~2 seconds to ~35-40 seconds
+sequential. Since these are independent, read-only GETs, `get_matchups`
+now fires them concurrently (a `ThreadPoolExecutor`, 20 workers) into
+the same per-instance `_bvp_cache` instead of one at a time -- **a real
+slate now builds in ~7 seconds** end to end (measured against the
+2026-08-28 live slate), and the 3-day site (`generate_site.py --days
+3`, what the GitHub Actions workflow actually runs) dropped from ~39s
+to ~15s. Same requests, same cache, same results -- purely a
+how-long-it-takes change, not a behavior change.
 
 ## Usage
 
