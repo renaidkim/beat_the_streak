@@ -760,10 +760,39 @@ same fixed shrinkage) and scored with the current production model:
 66.5% -- if anything slightly *under*-confident, not overconfident.
 Reassuring, but only 5 players is too small a sample to be a real
 verdict either way -- treat it as "no evidence the shrinkage fix alone
-is dangerous," not "proven safe." Whether to also add a hard minimum-
-career-at-bats eligibility floor (a product/risk-tolerance choice, not
-something this sample size can settle) is an open question for the
-next round.
+is dangerous," not "proven safe."
+
+**Follow-up: is a hard minimum-at-bats eligibility floor also needed,
+on top of the shrinkage fix?** Wrong question to answer with a
+calibration check (log loss doesn't know about a *selection* policy) --
+right one is `pick_accuracy.py`'s actual metric, the hit rate of the
+app's real top-1/top-2 daily picks. Added a `total_known_ab` column
+(career AB entering the season, 0 for a true rookie, plus this season's
+own AB entering that specific game -- point-in-time, not a season
+constant) and swept floors 0/10/25/50/100/150/200/300/500 combined AB,
+excluding anyone below the floor from being eligible for that day's
+top-1/top-2 pick, over the full 139-day 2026 holdout. Every floor
+produced **identical** top-1 (76.3%) and top-2 (~73%) hit rates -- down
+to zero change in which batters got picked. The reason: with the
+shrinkage fix in place, not one row with fewer than 100 combined career+
+season at-bats was *ever* selected as a top-1 or top-2 daily pick across
+the entire season, competing against a real day's full field (50-95
+batters). Even a rookie's single best relative day at under 25 known
+at-bats only reached 33rd place in that day's ranking, nowhere near
+selectable. (For context: Kaelen Culpepper, the live example that
+started this investigation, only appeared in an earlier debug listing
+because it was run with `--picks 10`; the app's actual default,
+`--picks 2` -- what the site itself uses -- would never have surfaced
+him.)
+
+**Conclusion: no additional floor was added.** The shrinkage fix alone
+already does everything a hard floor would do, for free, with none of a
+floor's downside (a hard cutoff would also block a legitimately
+excellent, if unproven, rookie in some scenario this backtest didn't
+happen to cover -- shrinkage degrades gracefully with sample size
+instead of drawing an arbitrary line). Revisit only if a future case
+shows the shrinkage protection failing in a way a floor would have
+caught -- none has, in a full season of testing.
 
 ## Why same-pitcher picks aren't avoided
 
