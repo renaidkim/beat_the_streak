@@ -118,6 +118,20 @@ def _explain(features: BatterFeatures, pitcher_confirmed: bool) -> list[str]:
     model's own inputs stand out for this matchup. Only features the
     model actually uses are described here (see build_features/rank.py's
     docstring) -- nothing gets a reason string it isn't backed by.
+
+    Every branch below can fire regardless of whether the *other* branches
+    push the same direction -- a batter can be #1 for the day while also
+    having a below-average on-base number, if enough other factors (a
+    contact-prone pitcher, a hitter-friendly park, ...) outweigh it. Each
+    string is worded to make clear on its own which way it points --
+    "though"/"despite" for anything working against a higher hit
+    probability -- so the list doesn't read as if everything under "Why"
+    supports the ranking when some entries are honest countervailing
+    factors that got outweighed, not supporting ones. Direction matches
+    train_ml_model.py's MONOTONIC_CST for each feature (career_avg/
+    career_obp/pitcher_oba_against/pitcher_k9_career/park_factor/
+    batting_order/bvp_delta) -- kept in sync by comment, same pattern as
+    SHRINK_C_*/MIN_BVP_AB elsewhere.
     """
     reasons: list[str] = []
 
@@ -127,32 +141,32 @@ def _explain(features: BatterFeatures, pitcher_confirmed: bool) -> list[str]:
     if features.career_avg - LEAGUE_AVG_AVG >= 0.020:
         reasons.append(f"strong career hitter (.{round(features.career_avg * 1000):03d} career avg)")
     elif LEAGUE_AVG_AVG - features.career_avg >= 0.020:
-        reasons.append(f"light-hitting career average (.{round(features.career_avg * 1000):03d})")
+        reasons.append(f"though a light-hitting career average (.{round(features.career_avg * 1000):03d})")
 
     if features.career_obp - LEAGUE_AVG_OBP >= 0.020:
         reasons.append(f"strong on-base skill (.{round(features.career_obp * 1000):03d} career OBP)")
     elif LEAGUE_AVG_OBP - features.career_obp >= 0.020:
-        reasons.append(f"below-average on-base skill (.{round(features.career_obp * 1000):03d} career OBP)")
+        reasons.append(f"though below-average on-base skill (.{round(features.career_obp * 1000):03d} career OBP)")
 
     if features.pitcher_oba_against - LEAGUE_AVG_AVG >= 0.015:
         reasons.append(f"contact-prone pitcher (.{round(features.pitcher_oba_against * 1000):03d} against)")
     elif LEAGUE_AVG_AVG - features.pitcher_oba_against >= 0.015:
-        reasons.append(f"tough pitcher (.{round(features.pitcher_oba_against * 1000):03d} against)")
+        reasons.append(f"though facing a tough pitcher (.{round(features.pitcher_oba_against * 1000):03d} against)")
 
     if features.pitcher_k9_career - LEAGUE_AVG_PITCHER_K9 >= 1.5:
-        reasons.append(f"high-strikeout pitcher ({features.pitcher_k9_career:.1f} career K/9)")
+        reasons.append(f"though a high-strikeout pitcher ({features.pitcher_k9_career:.1f} career K/9)")
     elif LEAGUE_AVG_PITCHER_K9 - features.pitcher_k9_career >= 1.5:
         reasons.append(f"low-strikeout, contact-oriented pitcher ({features.pitcher_k9_career:.1f} career K/9)")
 
     if features.park_factor >= 1.05:
         reasons.append(f"hitter-friendly park (factor {features.park_factor:.2f})")
     elif features.park_factor <= 0.95:
-        reasons.append(f"pitcher-friendly park (factor {features.park_factor:.2f})")
+        reasons.append(f"though a pitcher-friendly park (factor {features.park_factor:.2f})")
 
     if features.batting_order <= 2:
         reasons.append(f"batting near the top of the order ({int(features.batting_order)})")
     elif features.batting_order >= 8:
-        reasons.append(f"batting near the bottom of the order ({int(features.batting_order)})")
+        reasons.append(f"though batting near the bottom of the order ({int(features.batting_order)})")
 
     # bvp_delta is already 0.0 below MIN_BVP_AB at-bats (see data.py /
     # train_ml_model.py) -- these thresholds only ever fire on a sample
@@ -166,7 +180,7 @@ def _explain(features: BatterFeatures, pitcher_confirmed: bool) -> list[str]:
         )
     elif features.bvp_delta <= -0.100:
         reasons.append(
-            f"has struggled against this pitcher in {features.bvp_ab} career at-bats "
+            f"though has struggled against this pitcher in {features.bvp_ab} career at-bats "
             f"({features.bvp_delta:+.3f} vs. own season avg)"
         )
 

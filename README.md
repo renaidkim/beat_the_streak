@@ -794,6 +794,30 @@ instead of drawing an arbitrary line). Revisit only if a future case
 shows the shrinkage protection failing in a way a floor would have
 caught -- none has, in a full season of testing.
 
+### Round nine: "Why" reasons that actually worked against the pick
+
+Spotted live: Brett Sullivan's #1 daily pick listed "below-average
+on-base skill (.284 career OBP)" under the "Why" column, with no
+indication it was actually a negative. `_explain()` was, by design,
+purely descriptive -- it surfaces whichever of the model's own inputs
+stand out in *either* direction, not just the ones supporting the
+ranking (see its own docstring). A batter can legitimately be the day's
+top pick while also having a below-average OBP, if other factors (a
+contact-prone pitcher, a hitter-friendly park) outweigh it -- but a bare
+"below-average on-base skill" string under a "Why" heading reads as if
+it were support for the ranking rather than a countervailing factor
+that got outweighed.
+
+Fixed by wording: every reason that points the *wrong* way for a higher
+hit probability (light-hitting average, below-average OBP, a tough or
+high-strikeout pitcher, a pitcher-friendly park, batting near the
+bottom of the order, a rough history against this specific pitcher) now
+starts with "though"/"despite" framing, so it reads correctly regardless
+of what else is in the list, without needing to know the overall
+verdict. No change to `Pick.reasons`'s type or to how the site/CLI
+render it (a flat semicolon-joined list) -- the fix lives entirely in
+the strings `_explain()` returns.
+
 ## Why same-pitcher picks aren't avoided
 
 `pick_top` used to skip a pick if it shared an opposing pitcher with one

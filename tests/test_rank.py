@@ -55,6 +55,50 @@ def test_bvp_reason_includes_at_bat_count_not_just_historically():
     assert not any("historically" in r for r in pick.reasons)
 
 
+def test_unfavorable_reasons_are_worded_as_countervailing_not_supporting():
+    # _explain() lists whatever stands out in EITHER direction -- a
+    # batter can be a top pick while also having a below-average OBP, if
+    # other factors (a weak pitcher, a hitter-friendly park) outweigh it.
+    # The site/CLI just join reasons under a "Why" heading, so a bare
+    # "below-average on-base skill" reads as if it supported the
+    # ranking. Reported live: Brett Sullivan's #1 pick listed
+    # "below-average on-base skill" with no indication it was actually
+    # working against the prediction. Each unfavorable reason must be
+    # worded to signal that on its own ("though"/"despite"), not left to
+    # read the same as a favorable one.
+    matchup = make_matchup(
+        batter=make_batter(career_avg=0.200, career_obp=0.280),
+        pitcher=make_pitcher(oba_against=0.200, k9_career=11.0),
+        park_factor=0.90, batting_order=9,
+    )
+    pick = score_matchup(matchup)
+    unfavorable_phrases = [
+        "light-hitting career average", "below-average on-base skill",
+        "facing a tough pitcher", "high-strikeout pitcher",
+        "pitcher-friendly park", "batting near the bottom of the order",
+    ]
+    fired = [r for r in pick.reasons if any(p in r for p in unfavorable_phrases)]
+    assert fired, "expected at least one unfavorable reason to fire in this context"
+    assert all(r.startswith("though") for r in fired)
+
+
+def test_favorable_reasons_are_not_prefixed_with_though():
+    matchup = make_matchup(
+        batter=make_batter(career_avg=0.320, career_obp=0.400),
+        pitcher=make_pitcher(oba_against=0.310, k9_career=5.5),
+        park_factor=1.15, batting_order=1,
+    )
+    pick = score_matchup(matchup)
+    favorable_phrases = [
+        "strong career hitter", "strong on-base skill", "contact-prone pitcher",
+        "low-strikeout, contact-oriented pitcher", "hitter-friendly park",
+        "batting near the top of the order",
+    ]
+    fired = [r for r in pick.reasons if any(p in r for p in favorable_phrases)]
+    assert fired, "expected at least one favorable reason to fire in this context"
+    assert not any(r.startswith("though") for r in fired)
+
+
 def test_poor_history_against_this_pitcher_lowers_probability():
     # bvp_delta is conditionally rather than uniformly important, like
     # platoon_delta -- flat at the plain default context, but shows a
